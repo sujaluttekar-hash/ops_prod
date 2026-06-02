@@ -11,9 +11,117 @@ const DOT_COLORS: Record<string, { bg: string; color: string }> = {
   green: { bg: 'rgba(151,196,89,0.2)', color: '#2D5A0E' },
 };
 
+function AddDelightModal({ onClose }: { onClose: () => void }) {
+  const [form, setForm] = useState({ guest: '', property: '', butler: '', category: '', date: '', notes: '' });
+  const [saved, setSaved] = useState(false);
+
+  function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaved(true);
+    setTimeout(onClose, 1000);
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }} onClick={onClose}>
+      <div style={{
+        background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480,
+        boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
+      }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Add guest delight</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--muted-fg)', lineHeight: 1 }}>✕</button>
+        </div>
+        <div className="sv-strip" style={{ marginBottom: 20 }} />
+
+        {saved ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Delight added!</div>
+          </div>
+        ) : (
+          <form onSubmit={handleSave}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 5 }}>Guest name *</label>
+                <input className="sv-input" style={{ width: '100%' }} placeholder="e.g. Sharma family" value={form.guest} onChange={e => setForm(f => ({ ...f, guest: e.target.value }))} required />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 5 }}>Property *</label>
+                <select className="sv-select" style={{ width: '100%' }} value={form.property} onChange={e => setForm(f => ({ ...f, property: e.target.value }))} required>
+                  <option value="">Select</option>
+                  <option>Villa Serenity</option>
+                  <option>Casa Azure</option>
+                  <option>The Hillside</option>
+                  <option>Villa Bloom</option>
+                  <option>Casa Paradiso</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 5 }}>Butler assigned *</label>
+                <select className="sv-select" style={{ width: '100%' }} value={form.butler} onChange={e => setForm(f => ({ ...f, butler: e.target.value }))} required>
+                  <option value="">Select</option>
+                  <option>Ravi Kumar</option>
+                  <option>Pooja Nair</option>
+                  <option>Arjun Singh</option>
+                  <option>Meena Joshi</option>
+                  <option>Karan Mehta</option>
+                  <option>Divya Shah</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 5 }}>Category *</label>
+                <select className="sv-select" style={{ width: '100%' }} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} required>
+                  <option value="">Select</option>
+                  <option>Birthday</option>
+                  <option>Anniversary</option>
+                  <option>Honeymoon</option>
+                  <option>Welcome</option>
+                  <option>Kids special</option>
+                  <option>Surprise</option>
+                  <option>Pet stay</option>
+                  <option>Turndown</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 5 }}>Date *</label>
+                <input className="sv-input" type="date" style={{ width: '100%' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 5 }}>Status</label>
+                <select className="sv-select" style={{ width: '100%' }}>
+                  <option>Pending</option>
+                  <option>Completed</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 5 }}>Notes / instructions</label>
+              <textarea className="sv-input" style={{ width: '100%', minHeight: 72, resize: 'vertical' }} placeholder="e.g. Flower surprise + cake arranged by 6 PM" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+            <div className="upload-zone" style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 20, marginBottom: 4 }}>📎</div>
+              <div style={{ fontSize: 12 }}>Attach photo (optional)</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
+              <button type="submit" className="sv-btn sv-btn-primary">Save delight</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DelightPage() {
   const [filterProperty, setFilterProperty] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [showModal, setShowModal] = useState(false);
 
   const filtered = guestDelights.filter(d =>
     (filterProperty === 'All' || d.property === filterProperty) &&
@@ -27,10 +135,11 @@ export default function DelightPage() {
 
   return (
     <>
+      {showModal && <AddDelightModal onClose={() => setShowModal(false)} />}
       <Topbar
         title="Guest delight"
         subtitle="Calendar and delight tracking"
-        actions={<button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }}>+ Add delight</button>}
+        actions={<button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowModal(true)}>+ Add delight</button>}
       />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
