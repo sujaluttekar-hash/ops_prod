@@ -1,6 +1,6 @@
 'use client';
 import Topbar from '@/components/layout/Topbar';
-import { butlers, tasks, huddles } from '@/lib/data';
+import { butlers, tasks, huddles, guestDelights } from '@/lib/data';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 
 export default function DashboardPage() {
@@ -33,8 +33,18 @@ export default function DashboardPage() {
           </div>
           <div className="metric-card peach">
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Guest delights</div>
-            <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--sv-dark)', lineHeight: 1 }}>12</div>
-            <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>8 completed this week</div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--sv-dark)', lineHeight: 1 }}>
+              {guestDelights.filter(d => d.status === 'completed').length}
+              <span style={{ fontSize: 16, fontWeight: 400, color: 'var(--muted-fg)' }}>/{guestDelights.length}</span>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <div className="progress-track">
+                <div className="progress-fill fill-peach" style={{ width: `${Math.round(guestDelights.filter(d => d.status === 'completed').length / guestDelights.length * 100)}%` }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
+                {guestDelights.filter(d => d.status === 'completed').length} done · {guestDelights.filter(d => d.status !== 'completed').length} pending
+              </div>
+            </div>
           </div>
           <div className="metric-card coral">
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Avg quiz score</div>
