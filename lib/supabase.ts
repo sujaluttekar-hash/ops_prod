@@ -1,20 +1,17 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ryuxwnbrdsjwzwdimynd.supabase.co';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzOTkxNTgsImV4cCI6MjA5NTk3NTE1OH0.fhv7K_QqLsPXQdJazgF6sf1upjt5WFeLRGfH5r8oAzQ';
+
 let _client: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
   if (!_client) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
-    if (!url || !key) {
-      throw new Error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set');
-    }
-    _client = createClient(url, key);
+    _client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
   return _client;
 }
 
-// Safe export — only resolves at call time, never at module load
 export const supabase = {
   get auth() { return getSupabase().auth; },
   from: (...args: Parameters<SupabaseClient['from']>) => getSupabase().from(...args),
@@ -29,7 +26,6 @@ export const BUCKETS = {
   TRAINING: 'training-materials',
 };
 
-// ── Types ─────────────────────────────────────────────────────
 export type Profile = {
   id: string; name: string; email: string;
   role: 'super_admin' | 'ops_manager' | 'butler' | 'trainer';
@@ -78,7 +74,6 @@ export type Credential = {
   value: string; expiry: string | null; expiry_warning: boolean;
 };
 
-// ── Auth ──────────────────────────────────────────────────────
 export async function signIn(email: string, password: string) {
   return getSupabase().auth.signInWithPassword({ email, password });
 }
@@ -93,8 +88,6 @@ export async function getUser() {
   const { data: { user } } = await getSupabase().auth.getUser();
   return user;
 }
-
-// ── Fetchers ──────────────────────────────────────────────────
 export async function fetchProfiles(): Promise<Profile[]> {
   const { data } = await getSupabase().from('profiles').select('*').eq('is_active', true).order('name');
   return data ?? [];
