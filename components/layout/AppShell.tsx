@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getCurrentUser, getRoleLabel, isSupervisor, isAdmin, type AppUser } from '@/lib/auth';
+import { getCurrentUser, getRoleLabel, type AppUser } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
 
 const adminNav = [
@@ -11,10 +11,10 @@ const adminNav = [
     { href: '/dashboard', icon: '▣', label: 'Dashboard' },
   ]},
   { section: 'Operations', items: [
-    { href: '/delight',  icon: '♡', label: 'Guest delight' },
-    { href: '/tasks',    icon: '✓', label: 'Tasks' },
-    { href: '/roster',   icon: '▦', label: 'Roster' },
+    { href: '/delight',    icon: '♡', label: 'Guest delight' },
     { href: '/allocation', icon: '◧', label: 'Allocation' },
+    { href: '/tasks',      icon: '✓', label: 'Tasks' },
+    { href: '/roster',     icon: '▦', label: 'Roster' },
   ]},
   { section: 'Learning', items: [
     { href: '/huddle',   icon: '◎', label: 'Huddles' },
@@ -33,10 +33,10 @@ const supervisorNav = [
     { href: '/dashboard', icon: '▣', label: 'Dashboard' },
   ]},
   { section: 'Operations', items: [
-    { href: '/delight',  icon: '♡', label: 'Delight records' },
-    { href: '/tasks',    icon: '✓', label: 'Tasks' },
-    { href: '/roster',   icon: '▦', label: 'Roster' },
+    { href: '/delight',    icon: '♡', label: 'Delight records' },
     { href: '/allocation', icon: '◧', label: 'Allocation' },
+    { href: '/tasks',      icon: '✓', label: 'Tasks' },
+    { href: '/roster',     icon: '▦', label: 'Roster' },
   ]},
   { section: 'Learning', items: [
     { href: '/huddle',   icon: '◎', label: 'Huddles' },
@@ -70,25 +70,17 @@ function getNav(role: string) {
   return butlerNav;
 }
 
-function RoleBadge({ role }: { role: string }) {
-  const colors: Record<string, { bg: string; color: string }> = {
-    super_admin: { bg: 'rgba(233,160,167,0.2)', color: '#E9A0A7' },
-    ops_manager: { bg: 'rgba(254,213,169,0.2)', color: '#FED5A9' },
-    butler:      { bg: 'rgba(156,204,252,0.15)', color: '#9CCCFC' },
-    trainer:     { bg: 'rgba(151,196,89,0.15)', color: '#97C459' },
-  };
-  const c = colors[role] ?? colors.butler;
-  return (
-    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: c.bg, color: c.color, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-      {getRoleLabel(role as any)}
-    </span>
-  );
-}
+const roleBadgeStyle: Record<string, { bg: string; color: string }> = {
+  super_admin: { bg: 'rgba(233,160,167,0.2)', color: '#E9A0A7' },
+  ops_manager: { bg: 'rgba(254,213,169,0.2)', color: '#FED5A9' },
+  butler:      { bg: 'rgba(156,204,252,0.15)', color: '#9CCCFC' },
+  trainer:     { bg: 'rgba(151,196,89,0.15)', color: '#97C459' },
+};
 
 function Sidebar({ user }: { user: AppUser | null }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const nav = user ? getNav(user.role) : butlerNav;
+  const nav = user ? getNav(user.role) : [];
+  const badge = user ? (roleBadgeStyle[user.role] ?? roleBadgeStyle.butler) : null;
 
   async function handleLogout() {
     await getSupabase().auth.signOut();
@@ -108,42 +100,52 @@ function Sidebar({ user }: { user: AppUser | null }) {
         </div>
       </div>
 
-      {/* Nav */}
+      {/* Nav items — only render once user is loaded */}
       <div style={{ flex: 1, paddingBottom: 8 }}>
-        {nav.map(section => (
-          <div key={section.section}>
-            <div className="section-label">{section.section}</div>
-            {section.items.map(item => (
-              <Link key={item.href} href={item.href}
-                className={`nav-item ${pathname === item.href ? 'active' : ''}`}
-                style={{ textDecoration: 'none' }}>
-                <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        ))}
+        {!user ? (
+          <div style={{ padding: '20px 16px', color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>Loading…</div>
+        ) : (
+          nav.map(section => (
+            <div key={section.section}>
+              <div className="section-label">{section.section}</div>
+              {section.items.map(item => (
+                <Link key={item.href} href={item.href}
+                  className={`nav-item ${pathname === item.href ? 'active' : ''}`}
+                  style={{ textDecoration: 'none' }}>
+                  <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          ))
+        )}
       </div>
 
-      {/* User */}
+      {/* User footer */}
       <div style={{ padding: '12px 16px', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #FED5A9, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#1B1D1F', flexShrink: 0 }}>
-            {user?.initials ?? '??'}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.name ?? 'Loading...'}
+        {user ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #FED5A9, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#1B1D1F', flexShrink: 0 }}>
+              {user.initials}
             </div>
-            <div style={{ marginTop: 3 }}>
-              {user && <RoleBadge role={user.role} />}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.name}
+              </div>
+              {badge && (
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: badge.bg, color: badge.color, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 3, display: 'inline-block' }}>
+                  {getRoleLabel(user.role)}
+                </span>
+              )}
             </div>
+            <button onClick={handleLogout} title="Sign out"
+              style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+              ⏻
+            </button>
           </div>
-          <button onClick={handleLogout} title="Sign out"
-            style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-            ⏻
-          </button>
-        </div>
+        ) : (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>Loading session…</div>
+        )}
       </div>
     </nav>
   );
@@ -153,12 +155,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname === '/' || pathname === '/login';
   const [user, setUser] = useState<AppUser | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!isAuthPage) {
-      getCurrentUser().then(setUser);
-    }
-  }, [pathname, isAuthPage]);
+    if (isAuthPage) { setReady(true); return; }
+
+    // Load user immediately
+    getCurrentUser().then(u => { setUser(u); setReady(true); });
+
+    // Also listen for auth state changes (catches login/logout in other tabs)
+    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        getCurrentUser().then(setUser);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [isAuthPage, pathname]);
 
   if (isAuthPage) return <>{children}</>;
 
@@ -166,10 +181,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar user={user} />
       <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-        {/* Role context banner for non-admins */}
-        {user && user.role === 'butler' && (
-          <div style={{ background: 'rgba(156,204,252,0.08)', borderBottom: '0.5px solid rgba(156,204,252,0.2)', padding: '6px 20px', fontSize: 12, color: '#9CCCFC', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>👤</span> Logged in as <strong>{user.name}</strong> · {user.squad ?? 'No squad assigned'}
+        {/* Butler context banner */}
+        {ready && user?.role === 'butler' && (
+          <div style={{ background: 'rgba(156,204,252,0.08)', borderBottom: '0.5px solid rgba(156,204,252,0.15)', padding: '6px 20px', fontSize: 12, color: '#9CCCFC', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>👤</span> {user.name} · {user.squad ?? 'No squad assigned'}
           </div>
         )}
         {children}
