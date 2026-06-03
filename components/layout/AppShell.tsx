@@ -71,45 +71,58 @@ const roleBadgeStyle: Record<string, { bg: string; color: string }> = {
   trainer:     { bg: 'rgba(151,196,89,0.15)', color: '#97C459' },
 };
 
-async function loadUserFromSession(): Promise<AppUser | null> {
+async function getSessionUser(): Promise<AppUser | null> {
   try {
     const sb = getSupabase();
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) return null;
+    // Get the actual current session
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.user) return null;
 
+    const authUser = session.user;
+
+    // Look up profile strictly by the session user's ID
     const { data: profile } = await sb
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
-      .single();
+      .eq('id', authUser.id)
+      .maybeSingle();
 
-    if (!profile) {
-      // Try by email
-      const { data: byEmail } = await sb
-        .from('profiles')
-        .select('*')
-        .eq('email', user.email ?? '')
-        .single();
-      if (!byEmail) return null;
+    if (profile) {
       return {
-        id: user.id,
-        name: byEmail.name,
-        email: byEmail.email ?? user.email ?? '',
-        role: byEmail.role as AppRole,
-        squad: byEmail.squad,
-        initials: byEmail.name.slice(0, 2).toUpperCase(),
+        id: authUser.id,
+        name: profile.name,
+        email: profile.email ?? authUser.email ?? '',
+        role: profile.role as AppRole,
+        squad: profile.squad,
+        initials: profile.name.slice(0, 2).toUpperCase(),
       };
     }
 
-    return {
-      id: user.id,
-      name: profile.name,
-      email: profile.email ?? user.email ?? '',
-      role: profile.role as AppRole,
-      squad: profile.squad,
-      initials: profile.name.slice(0, 2).toUpperCase(),
-    };
-  } catch {
+    // Profile not found by ID — try by email and fix
+    if (authUser.email) {
+      const { data: byEmail } = await sb
+        .from('profiles')
+        .select('*')
+        .eq('email', authUser.email)
+        .maybeSingle();
+
+      if (byEmail) {
+        // Fix the ID mismatch silently
+        await sb.from('profiles').update({ id: authUser.id }).eq('email', authUser.email);
+        return {
+          id: authUser.id,
+          name: byEmail.name,
+          email: byEmail.email ?? authUser.email,
+          role: byEmail.role as AppRole,
+          squad: byEmail.squad,
+          initials: byEmail.name.slice(0, 2).toUpperCase(),
+        };
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.error('getSessionUser:', e);
     return null;
   }
 }
@@ -161,9 +174,9 @@ function Sidebar({ user }: { user: AppUser | null }) {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.name ?? '—'}
             </div>
-            {badge && (
+            {badge && user && (
               <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: badge.bg, color: badge.color, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 3, display: 'inline-block' }}>
-                {getRoleLabel(user!.role)}
+                {getRoleLabel(user.role)}
               </span>
             )}
           </div>
@@ -186,19 +199,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAuthPage) { setReady(true); return; }
 
-    // Always load fresh from Supabase auth
-    loadUserFromSession().then(u => {
-      setUser(u);
-      setReady(true);
-    });
+    getSessionUser().then(u => { setUser(u); setReady(true); });
 
-    // Re-load on any auth state change
-    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
+    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
         setUser(null);
         window.location.href = '/login';
-      } else {
-        loadUserFromSession().then(setUser);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        getSessionUser().then(setUser);
       }
     });
 
