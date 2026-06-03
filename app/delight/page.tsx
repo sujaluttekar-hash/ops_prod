@@ -2,25 +2,25 @@
 import { useState, useRef, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { fetchGuestDelights, insertGuestDelight, uploadDelightPhoto, getSupabase, BUCKETS, type GuestDelight } from '@/lib/supabase';
-import { getCurrentUser, type AppUser } from '@/lib/auth';
+import { getCurrentUser, isSupervisor, type AppUser } from '@/lib/auth';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 
 const PHOTO_POINTERS = [
-  { key: 'arrival_selfie', label: 'Arrival selfie at villa', emoji: '🤳', note: 'With timestamp' },
-  { key: 'guest_welcome',  label: 'Guest welcome photo',    emoji: '🙏', note: '' },
-  { key: 'table_layout',   label: 'Table layout',           emoji: '🍽', note: 'Breakfast / Lunch / Dinner' },
-  { key: 'guest_delight',  label: 'Guest delight',          emoji: '🎁', note: 'Low / zero cost' },
-  { key: 'exit_selfie',    label: 'Exit selfie at villa',   emoji: '👋', note: 'With timestamp' },
-  { key: 'experience',     label: 'Experiences',            emoji: '✨', note: 'Sit-down dinner / BBQ / birthday decor' },
-  { key: 'feedback',       label: 'Feedback',               emoji: '⭐', note: '5 star / 7 star' },
+  { key: 'arrival_selfie', label: 'Arrival selfie', emoji: '🤳', note: 'With timestamp' },
+  { key: 'guest_welcome',  label: 'Guest welcome',  emoji: '🙏', note: '' },
+  { key: 'table_layout',   label: 'Table layout',   emoji: '🍽', note: 'Breakfast / Lunch / Dinner' },
+  { key: 'guest_delight',  label: 'Guest delight',  emoji: '🎁', note: 'Low / zero cost' },
+  { key: 'exit_selfie',    label: 'Exit selfie',    emoji: '👋', note: 'With timestamp' },
+  { key: 'experience',     label: 'Experiences',    emoji: '✨', note: 'Sit-down dinner / BBQ / birthday decor' },
+  { key: 'feedback',       label: 'Feedback',       emoji: '⭐', note: '5 star / 7 star' },
 ];
 
 const BOOKING_TYPES = ['Check in','Check out','Booking (full day)','Non Booking Task','Booking','Non Booking'];
 
 type PhotoVal = { file: File; preview: string; timestamp: string } | null;
 type PhotoMap = Record<string, PhotoVal>;
-const CAL_DAYS = Array.from({ length: 30 }, (_, i) => i + 1);
 
+// ── Photo upload cell ────────────────────────────────────────
 function PhotoCell({ pointer, value, onChange }: { pointer: typeof PHOTO_POINTERS[0]; value: PhotoVal; onChange: (v: PhotoVal) => void }) {
   const ref = useRef<HTMLInputElement>(null);
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -31,7 +31,8 @@ function PhotoCell({ pointer, value, onChange }: { pointer: typeof PHOTO_POINTER
     reader.readAsDataURL(file);
   }
   return (
-    <div style={{ border: `1.5px dashed ${value ? '#97C459' : 'rgba(0,0,0,0.13)'}`, borderRadius: 10, padding: value ? 8 : 14, background: value ? 'rgba(151,196,89,0.05)' : 'transparent', cursor: 'pointer', minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, textAlign: 'center', transition: 'all 0.15s' }} onClick={() => ref.current?.click()}>
+    <div style={{ border: `1.5px dashed ${value ? '#97C459' : 'rgba(0,0,0,0.13)'}`, borderRadius: 10, padding: value ? 8 : 14, background: value ? 'rgba(151,196,89,0.05)' : 'transparent', cursor: 'pointer', minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, textAlign: 'center', transition: 'all 0.15s' }}
+      onClick={() => ref.current?.click()}>
       <input ref={ref} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
       {value ? (
         <>
@@ -51,6 +52,7 @@ function PhotoCell({ pointer, value, onChange }: { pointer: typeof PHOTO_POINTER
   );
 }
 
+// ── Add delight modal ────────────────────────────────────────
 function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({ your_name: user?.name ?? '', squad: user?.squad ?? '', booking_date: '', booking_id: '', villa_name: '', booking_type: '' });
   const [photos, setPhotos] = useState<PhotoMap>(Object.fromEntries(PHOTO_POINTERS.map(p => [p.key, null])));
@@ -81,7 +83,7 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
       <div style={{ background: '#fff', borderRadius: 18, padding: 28, width: '100%', maxWidth: 640, boxShadow: '0 32px 80px rgba(0,0,0,0.2)', marginTop: 20, marginBottom: 20 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-          <div><div style={{ fontSize: 16, fontWeight: 700 }}>Log butler activity</div><div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>Fill booking details + upload photo evidence</div></div>
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>Log butler activity</div><div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>Booking details + photo evidence</div></div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
         </div>
         <div className="sv-strip" style={{ marginBottom: 22 }} />
@@ -96,7 +98,7 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
             {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
             <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>Booking details</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-              {([['your_name','Your name *','text','e.g. Ravi Kumar',true],['squad','Your squad *','text','e.g. Lonavala',true],['booking_date','Booking date *','date','',true],['booking_id','Booking ID','text','e.g. BK-2026-04821',false],['villa_name','Villa name *','text','Type villa name',true]] as any[]).map(([key,label,type,ph,req]) => (
+              {([['your_name','Your name *','text','e.g. Ravi Kumar',true],['squad','Your squad *','text','e.g. Lonavala',true],['booking_date','Booking date *','date','',true],['booking_id','Booking ID','text','BK-2026-04821',false],['villa_name','Villa name *','text','Type villa name',true]] as any[]).map(([key,label,type,ph,req]) => (
                 <div key={key}>
                   <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>{label}</div>
                   <input className="sv-input" style={{ width: '100%' }} type={type} placeholder={ph} value={(form as any)[key]} onChange={f(key)} required={req} />
@@ -128,39 +130,105 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
   );
 }
 
-function PhotoLightbox({ photos, onClose }: { photos: { key: string; url: string; ts: string }[]; onClose: () => void }) {
+// ── Photo review modal (admin/supervisor) ────────────────────
+function PhotoReviewModal({ entry, onClose, onApprove }: { entry: GuestDelight; onClose: () => void; onApprove: () => void }) {
+  const photos = entry.delight_photos ?? [];
+  const sb = getSupabase();
+
+  async function handleApprove() {
+    await sb.from('guest_delights').update({ status: 'completed' }).eq('id', entry.id);
+    onApprove();
+    onClose();
+  }
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 16, padding: 24, maxWidth: 700, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Photo evidence — {photos.length} photo{photos.length !== 1 ? 's' : ''}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>✕</button>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 18, padding: 28, width: '100%', maxWidth: 720, boxShadow: '0 32px 80px rgba(0,0,0,0.3)', marginTop: 20, marginBottom: 20 }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Photo review — {entry.your_name}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>
+              {entry.villa_name} · {entry.booking_type} · {entry.booking_date ? new Date(entry.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-          {photos.map((p, i) => {
-            const ptr = PHOTO_POINTERS.find(x => x.key === p.key);
+        <div className="sv-strip" style={{ marginBottom: 20 }} />
+
+        {/* Booking info */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 20 }}>
+          {[
+            { label: 'Butler', value: entry.your_name },
+            { label: 'Squad', value: entry.squad ?? '—' },
+            { label: 'Booking ID', value: entry.booking_id ?? '—' },
+            { label: 'Villa', value: entry.villa_name },
+            { label: 'Type', value: entry.booking_type },
+            { label: 'Status', value: getStatusLabel(entry.status) },
+          ].map(f => (
+            <div key={f.label} style={{ background: 'var(--muted)', borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>{f.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{f.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Photos */}
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted-fg)' }}>
+          Photo evidence — {photos.length}/{PHOTO_POINTERS.length} uploaded
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 24 }}>
+          {PHOTO_POINTERS.map(ptr => {
+            const photo = photos.find(p => p.pointer_key === ptr.key);
+            const url = photo?.public_url ?? (photo?.storage_path ? sb.storage.from(BUCKETS.DELIGHT_PHOTOS).getPublicUrl(photo.storage_path).data.publicUrl : null);
             return (
-              <div key={i} style={{ borderRadius: 10, overflow: 'hidden', border: '0.5px solid var(--card-border)' }}>
-                <img src={p.url} alt={ptr?.label} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
-                <div style={{ padding: '8px 10px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600 }}>{ptr?.emoji} {ptr?.label}</div>
-                  <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 2 }}>{p.ts}</div>
+              <div key={ptr.key} style={{ borderRadius: 10, overflow: 'hidden', border: `1.5px solid ${photo ? '#97C459' : 'rgba(0,0,0,0.08)'}`, background: photo ? '#fff' : 'var(--muted)' }}>
+                {url ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    <img src={url} alt={ptr.label} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
+                  </a>
+                ) : (
+                  <div style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 28, opacity: 0.3 }}>{ptr.emoji}</span>
+                    <span style={{ fontSize: 10, color: 'var(--muted-fg)' }}>Not uploaded</span>
+                  </div>
+                )}
+                <div style={{ padding: '8px 10px', borderTop: '0.5px solid rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {photo ? '✅' : '⭕'} {ptr.label}
+                  </div>
+                  {photo && <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 2 }}>
+                    {photo.captured_at ? new Date(photo.captured_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : ''}
+                  </div>}
                 </div>
               </div>
             );
           })}
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)' }}>
+          <button className="sv-btn" onClick={onClose}>Close</button>
+          {entry.status !== 'completed' && (
+            <button className="sv-btn sv-btn-primary" onClick={handleApprove}>
+              ✓ Mark as completed
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
+// ── Main page ────────────────────────────────────────────────
 export default function DelightPage() {
   const [entries, setEntries] = useState<GuestDelight[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [lightbox, setLightbox] = useState<{ key: string; url: string; ts: string }[] | null>(null);
+  const [reviewEntry, setReviewEntry] = useState<GuestDelight | null>(null);
   const [filterType, setFilterType] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
   const [user, setUser] = useState<AppUser | null>(null);
 
   async function load() {
@@ -169,44 +237,52 @@ export default function DelightPage() {
     setEntries(data); setLoading(false);
   }
 
-  useEffect(() => { getCurrentUser().then(setUser); load(); }, []);
+  useEffect(() => {
+    const stored = localStorage.getItem('sv_profile');
+    if (stored) { try { setUser(JSON.parse(stored)); } catch {} }
+    load();
+  }, []);
 
   useEffect(() => {
-    const channel = getSupabase().channel('delight_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'guest_delights' }, load).subscribe();
+    const channel = getSupabase().channel('delight_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guest_delights' }, load)
+      .subscribe();
     return () => { getSupabase().removeChannel(channel); };
   }, []);
 
-  const filtered = entries.filter(e => filterType === 'All' || e.booking_type === filterType);
+  const isAdminOrSupervisor = user && isSupervisor(user.role);
+  const filtered = entries.filter(e =>
+    (filterType === 'All' || e.booking_type === filterType) &&
+    (filterStatus === 'All' || e.status === filterStatus)
+  );
   const done = entries.filter(e => e.status === 'completed').length;
-
-  function openLightbox(delight: GuestDelight) {
-    const photos = (delight.delight_photos ?? []).map(p => ({
-      key: p.pointer_key,
-      url: p.public_url ?? getSupabase().storage.from(BUCKETS.DELIGHT_PHOTOS).getPublicUrl(p.storage_path).data.publicUrl,
-      ts: p.captured_at ? new Date(p.captured_at).toLocaleString('en-IN') : new Date(p.uploaded_at).toLocaleString('en-IN'),
-    }));
-    setLightbox(photos);
-  }
+  const pending = entries.filter(e => e.status === 'pending').length;
+  const pct = entries.length > 0 ? Math.round(done / entries.length * 100) : 0;
 
   return (
     <>
       {showModal && <AddDelightModal user={user} onClose={() => setShowModal(false)} onSaved={load} />}
-      {lightbox && <PhotoLightbox photos={lightbox} onClose={() => setLightbox(null)} />}
-      <Topbar title="Guest delight" subtitle="Live photo evidence per booking"
+      {reviewEntry && <PhotoReviewModal entry={reviewEntry} onClose={() => setReviewEntry(null)} onApprove={load} />}
+
+      <Topbar title="Guest delight" subtitle="Photo evidence per booking"
         actions={<button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowModal(true)}>+ Log activity</button>} />
+
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
-          {[{ label: 'Total', value: entries.length, cls: 'blue' }, { label: 'Completed', value: done, cls: 'green' }, { label: 'Pending', value: entries.length - done, cls: 'coral' }, { label: 'Completion', value: entries.length > 0 ? `${Math.round(done/entries.length*100)}%` : '—', cls: 'peach' }].map(m => (
+          {[{ label: 'Total', value: entries.length, cls: 'blue' }, { label: 'Completed', value: done, cls: 'green' }, { label: 'Pending', value: pending, cls: 'coral' }, { label: 'Completion', value: `${pct}%`, cls: 'peach' }].map(m => (
             <div key={m.label} className={`metric-card ${m.cls}`}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{m.label}</div>
               <div style={{ fontSize: 32, fontWeight: 700 }}>{loading ? '…' : m.value}</div>
             </div>
           ))}
         </div>
+
+        {/* Photo pointers guide */}
         <div className="sv-card" style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Photo pointers — required per booking</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
             {PHOTO_POINTERS.map(p => (
               <div key={p.key} style={{ background: 'var(--muted)', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
                 <div style={{ fontSize: 22, marginBottom: 4 }}>{p.emoji}</div>
@@ -216,39 +292,84 @@ export default function DelightPage() {
             ))}
           </div>
         </div>
+
+        {/* Activity log */}
         <div className="sv-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Activity log <span className="badge badge-green" style={{ marginLeft: 6 }}>Live</span></div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              Activity log <span className="badge badge-green" style={{ marginLeft: 6 }}>Live</span>
+              {isAdminOrSupervisor && <span style={{ fontSize: 12, color: 'var(--muted-fg)', marginLeft: 8, fontWeight: 400 }}>Click any row to review photos</span>}
+            </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <select className="sv-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
                 <option value="All">All types</option>
                 {BOOKING_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
+              <select className="sv-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                <option value="All">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="overdue">Overdue</option>
+              </select>
               <button className="sv-btn" style={{ fontSize: 12 }} onClick={load}>↻ Refresh</button>
             </div>
           </div>
-          {loading ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted-fg)' }}>Loading…</div> :
-            filtered.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted-fg)' }}>No entries yet. Click <strong>+ Log activity</strong> to add the first one.</div> : (
+
+          {loading ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted-fg)' }}>Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted-fg)' }}>
+              No entries yet. Click <strong>+ Log activity</strong> to add the first one.
+            </div>
+          ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="sv-table">
-                <thead><tr><th>Butler</th><th>Squad</th><th>Date</th><th>Booking ID</th><th>Villa</th><th>Type</th><th>Photos</th><th>Status</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Butler</th><th>Squad</th><th>Date</th><th>Booking ID</th>
+                    <th>Villa</th><th>Type</th><th>Photos</th><th>Status</th>
+                    {isAdminOrSupervisor && <th>Review</th>}
+                  </tr>
+                </thead>
                 <tbody>
-                  {filtered.map(e => (
-                    <tr key={e.id}>
-                      <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div className="sv-avatar">{e.your_name.slice(0,2).toUpperCase()}</div><span style={{ fontWeight: 500 }}>{e.your_name}</span></div></td>
-                      <td style={{ color: 'var(--muted-fg)' }}>{e.squad ?? '—'}</td>
-                      <td style={{ color: 'var(--muted-fg)' }}>{e.booking_date ? new Date(e.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{e.booking_id ?? '—'}</td>
-                      <td>{e.villa_name}</td>
-                      <td><span className="badge badge-blue">{e.booking_type}</span></td>
-                      <td>
-                        {(e.delight_photos?.length ?? 0) > 0
-                          ? <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => openLightbox(e)}>📷 {e.delight_photos?.length}/{PHOTO_POINTERS.length}</button>
-                          : <span style={{ fontSize: 12, color: 'var(--muted-fg)' }}>No photos</span>}
-                      </td>
-                      <td><span className={getStatusBadge(e.status)}>{getStatusLabel(e.status)}</span></td>
-                    </tr>
-                  ))}
+                  {filtered.map(e => {
+                    const photoCount = e.delight_photos?.length ?? 0;
+                    const allUploaded = photoCount === PHOTO_POINTERS.length;
+                    return (
+                      <tr key={e.id} style={{ cursor: isAdminOrSupervisor ? 'pointer' : 'default' }}
+                        onClick={() => isAdminOrSupervisor && setReviewEntry(e)}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div className="sv-avatar">{e.your_name.slice(0, 2).toUpperCase()}</div>
+                            <span style={{ fontWeight: 500 }}>{e.your_name}</span>
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--muted-fg)' }}>{e.squad ?? '—'}</td>
+                        <td style={{ color: 'var(--muted-fg)' }}>
+                          {e.booking_date ? new Date(e.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
+                        </td>
+                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{e.booking_id ?? '—'}</td>
+                        <td style={{ fontWeight: 500 }}>{e.villa_name}</td>
+                        <td><span className="badge badge-blue">{e.booking_type}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: allUploaded ? '#2D5A0E' : photoCount > 0 ? '#7A4A08' : 'var(--muted-fg)' }}>
+                              📷 {photoCount}/{PHOTO_POINTERS.length}
+                            </span>
+                            {allUploaded && <span className="badge badge-green">Complete</span>}
+                          </div>
+                        </td>
+                        <td><span className={getStatusBadge(e.status)}>{getStatusLabel(e.status)}</span></td>
+                        {isAdminOrSupervisor && (
+                          <td onClick={ev => { ev.stopPropagation(); setReviewEntry(e); }}>
+                            <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }}>
+                              {photoCount > 0 ? '🔍 Review' : '📋 View'}
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
