@@ -14,6 +14,7 @@ const adminNav = [
     { href: '/delight',  icon: '♡', label: 'Guest delight' },
     { href: '/tasks',    icon: '✓', label: 'Tasks' },
     { href: '/roster',   icon: '▦', label: 'Roster' },
+    { href: '/allocation', icon: '◧', label: 'Allocation' },
   ]},
   { section: 'Learning', items: [
     { href: '/huddle',   icon: '◎', label: 'Huddles' },
@@ -35,6 +36,7 @@ const supervisorNav = [
     { href: '/delight',  icon: '♡', label: 'Delight records' },
     { href: '/tasks',    icon: '✓', label: 'Tasks' },
     { href: '/roster',   icon: '▦', label: 'Roster' },
+    { href: '/allocation', icon: '◧', label: 'Allocation' },
   ]},
   { section: 'Learning', items: [
     { href: '/huddle',   icon: '◎', label: 'Huddles' },
