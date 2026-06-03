@@ -1,11 +1,9 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { signIn } from '@/lib/supabase';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,13 +13,18 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { error: authError } = await signIn(email, password);
-    if (authError) {
-      setError(authError.message);
+    try {
+      const { error: authError } = await signIn(email, password);
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+      } else {
+        // Hard redirect so cookies are sent with the next request
+        window.location.href = '/dashboard';
+      }
+    } catch (err: any) {
+      setError(err.message ?? 'Login failed');
       setLoading(false);
-    } else {
-      router.push('/dashboard');
-      router.refresh();
     }
   }
 
@@ -42,7 +45,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@stayvista.com"
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@stayvista.com"
               style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 10, fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' }} required />
           </div>
           <div style={{ marginBottom: 8 }}>
@@ -50,7 +53,11 @@ export default function LoginPage() {
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
               style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 10, fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' }} required />
           </div>
-          {error && <div style={{ fontSize: 12, color: '#E9A0A7', marginBottom: 8 }}>{error}</div>}
+          {error && (
+            <div style={{ fontSize: 12, color: '#E9A0A7', marginBottom: 8, padding: '8px 12px', background: 'rgba(233,160,167,0.1)', borderRadius: 8 }}>
+              ⚠ {error}
+            </div>
+          )}
           <button type="submit" disabled={loading}
             style={{ width: '100%', padding: 11, background: loading ? 'rgba(156,204,252,0.4)' : '#9CCCFC', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#1B1D1F', cursor: loading ? 'wait' : 'pointer', marginTop: 8 }}>
             {loading ? 'Signing in...' : 'Sign in'}
