@@ -73,14 +73,20 @@ const roleBadgeStyle: Record<string, { bg: string; color: string }> = {
 
 async function getSessionUser(): Promise<AppUser | null> {
   try {
-    const sb = getSupabase();
-    // Get the actual current session
+    // Create a fresh client to avoid cached tokens
+    const { createClient } = await import('@supabase/supabase-js');
+    const sb = createClient(
+      'https://ryuxwnbrdsjwzwdimynd.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzOTkxNTgsImV4cCI6MjA5NTk3NTE1OH0.fhv7K_QqLsPXQdJazgF6sf1upjt5WFeLRGfH5r8oAzQ',
+      { auth: { persistSession: true, storageKey: 'sb-session' } }
+    );
+
     const { data: { session } } = await sb.auth.getSession();
     if (!session?.user) return null;
 
     const authUser = session.user;
+    console.log('[AppShell] session user:', authUser.email, authUser.id);
 
-    // Look up profile strictly by the session user's ID
     const { data: profile } = await sb
       .from('profiles')
       .select('*')
@@ -88,6 +94,7 @@ async function getSessionUser(): Promise<AppUser | null> {
       .maybeSingle();
 
     if (profile) {
+      console.log('[AppShell] profile found:', profile.name, profile.role);
       return {
         id: authUser.id,
         name: profile.name,
@@ -98,7 +105,6 @@ async function getSessionUser(): Promise<AppUser | null> {
       };
     }
 
-    // Profile not found by ID — try by email and fix
     if (authUser.email) {
       const { data: byEmail } = await sb
         .from('profiles')
@@ -107,8 +113,7 @@ async function getSessionUser(): Promise<AppUser | null> {
         .maybeSingle();
 
       if (byEmail) {
-        // Fix the ID mismatch silently
-        await sb.from('profiles').update({ id: authUser.id }).eq('email', authUser.email);
+        console.log('[AppShell] profile by email:', byEmail.name, byEmail.role);
         return {
           id: authUser.id,
           name: byEmail.name,
