@@ -11,6 +11,8 @@ export const BUCKETS = {
   TRAINING: 'training-materials',
 };
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+
 export type Profile = {
   id: string;
   name: string;
@@ -89,7 +91,52 @@ export type Training = {
   has_quiz: boolean;
 };
 
-// ── Data fetchers ─────────────────────────────────────────────
+export type Submission = {
+  id: string;
+  butler_id: string;
+  butler_name: string;
+  task_type: string;
+  property: string;
+  date_of_service: string;
+  submitted_at: string;
+  notes: string;
+  photo_url: string | null;
+  status: 'pending' | 'approved';
+};
+
+export type Credential = {
+  id: string;
+  name: string;
+  type: string;
+  property: string;
+  value: string;
+  expiry: string | null;
+  expiry_warning: boolean;
+};
+
+// ── Auth ───────────────────────────────────────────────────────────────────────
+
+export async function signIn(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  return { data, error };
+}
+
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  return { error };
+}
+
+export async function getSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session;
+}
+
+export async function getUser() {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
+
+// ── Data fetchers ──────────────────────────────────────────────────────────────
 
 export async function fetchProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
@@ -164,6 +211,35 @@ export async function fetchTasks(): Promise<Task[]> {
   return data ?? [];
 }
 
+export async function fetchSubmissions(): Promise<Submission[]> {
+  const { data, error } = await supabase
+    .from('submissions')
+    .select('*')
+    .order('submitted_at', { ascending: false });
+  if (error) { console.error('fetchSubmissions:', error.message); return []; }
+  return data ?? [];
+}
+
+export async function insertSubmission(payload: Partial<Submission>) {
+  const { data, error } = await supabase
+    .from('submissions')
+    .insert(payload)
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function uploadTaskPhoto(file: File, submissionId: string): Promise<string | null> {
+  const ext = file.name.split('.').pop();
+  const path = `${submissionId}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from(BUCKETS.TASK_PHOTOS)
+    .upload(path, file, { upsert: true });
+  if (error) { console.error('uploadTaskPhoto:', error.message); return null; }
+  const { data } = supabase.storage.from(BUCKETS.TASK_PHOTOS).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export async function fetchHuddles(): Promise<Huddle[]> {
   const { data, error } = await supabase
     .from('huddles')
@@ -179,6 +255,15 @@ export async function fetchTrainings(): Promise<Training[]> {
     .select('*')
     .order('training_date', { ascending: false });
   if (error) { console.error('fetchTrainings:', error.message); return []; }
+  return data ?? [];
+}
+
+export async function fetchCredentials(): Promise<Credential[]> {
+  const { data, error } = await supabase
+    .from('credentials')
+    .select('*')
+    .order('name');
+  if (error) { console.error('fetchCredentials:', error.message); return []; }
   return data ?? [];
 }
 

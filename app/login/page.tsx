@@ -1,13 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SESSIONS } from '@/lib/session';
-import { BUTLERS } from '@/lib/data';
-
-const ACCOUNTS = [
-  { label: 'Admin (Aditi)', key: 'admin', email: 'aditi@stayvista.com', password: 'admin123' },
-  ...BUTLERS.map(b => ({ label: b.name, key: b.id, email: `${b.name.split(' ')[0].toLowerCase()}@stayvista.com`, password: 'butler123' })),
-];
+import { signIn } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,26 +10,18 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  function login(key: string) {
-    const user = SESSIONS[key];
-    if (!user) return;
-    localStorage.setItem('sv_user', JSON.stringify(user));
-    router.push('/dashboard');
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const match = ACCOUNTS.find(a => a.email === email && a.password === password);
-    setTimeout(() => {
-      if (match) {
-        login(match.key);
-      } else {
-        setError('Invalid email or password');
-        setLoading(false);
-      }
-    }, 500);
+    const { error: authError } = await signIn(email, password);
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+    } else {
+      router.push('/dashboard');
+      router.refresh();
+    }
   }
 
   return (
@@ -55,13 +41,13 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="aditi@stayvista.com"
-              style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 10, fontSize: 14, color: '#fff', outline: 'none' }} required />
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@stayvista.com"
+              style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 10, fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' }} required />
           </div>
           <div style={{ marginBottom: 8 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Password</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
-              style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 10, fontSize: 14, color: '#fff', outline: 'none' }} required />
+              style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 10, fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' }} required />
           </div>
           {error && <div style={{ fontSize: 12, color: '#E9A0A7', marginBottom: 8 }}>{error}</div>}
           <button type="submit" disabled={loading}
@@ -70,18 +56,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick login */}
-        <div style={{ marginTop: 24, paddingTop: 18, borderTop: '0.5px solid rgba(255,255,255,0.07)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 10, textAlign: 'center' }}>Quick login</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {ACCOUNTS.map(acc => (
-              <button key={acc.key} onClick={() => login(acc.key)}
-                style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 10, color: 'rgba(255,255,255,0.55)', cursor: 'pointer' }}>
-                {acc.label}
-              </button>
-            ))}
-          </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginTop: 8 }}>Admin: admin123 · Butler: butler123</div>
+        <div style={{ marginTop: 20, fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>
+          Sign in with your StayVista email address
         </div>
       </div>
     </div>
