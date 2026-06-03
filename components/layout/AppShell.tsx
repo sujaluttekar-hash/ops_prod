@@ -79,7 +79,7 @@ const roleBadgeStyle: Record<string, { bg: string; color: string }> = {
 
 function Sidebar({ user }: { user: AppUser | null }) {
   const pathname = usePathname();
-  const nav = user ? getNav(user.role) : [];
+  const nav = getNav(user?.role ?? 'butler');
   const badge = user ? (roleBadgeStyle[user.role] ?? roleBadgeStyle.butler) : null;
 
   async function handleLogout() {
