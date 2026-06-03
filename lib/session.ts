@@ -10,7 +10,7 @@ export type SessionUser = {
 };
 
 export const SESSIONS: Record<string, SessionUser> = {
-  admin: { id: 'admin', name: 'Aditi Sharma', initials: 'AD', role: 'admin' },
+  admin: { id: 'admin', name: 'Aditi', initials: 'AD', role: 'admin' },
   b1: { id: 'b1', name: 'Manoj Valmiki',   initials: 'MV', role: 'butler', property: 'Villa Serenity' },
   b2: { id: 'b2', name: 'Kalpesh Ther',    initials: 'KT', role: 'butler', property: 'Casa Azure'     },
   b3: { id: 'b3', name: 'Kohinoor Shinde', initials: 'KS', role: 'butler', property: 'The Hillside'   },
