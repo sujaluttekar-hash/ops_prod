@@ -177,6 +177,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isAuthPage) return <>{children}</>;
 
+  // Don't render sidebar until we know who the user is
+  if (!ready) return (
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#141618' }}>
+      <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Loading…</div>
+    </div>
+  );
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar user={user} />
