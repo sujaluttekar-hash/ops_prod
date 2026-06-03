@@ -199,7 +199,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAuthPage) { setReady(true); return; }
 
-    getSessionUser().then(u => { setUser(u); setReady(true); });
+    // Verify session matches the user who just logged in
+    getSessionUser().then(u => {
+      const expectedUid = sessionStorage.getItem("sv_uid");
+      if (expectedUid && u && u.id !== expectedUid) {
+        // Session mismatch — force reload the correct user
+        getSupabase().auth.getSession().then(({ data }) => {
+          if (data.session?.user.id !== expectedUid) {
+            window.location.href = "/login";
+          }
+        });
+      }
+      setUser(u);
+      setReady(true);
+    });
 
     const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {

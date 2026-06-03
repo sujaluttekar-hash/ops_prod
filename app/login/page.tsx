@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { useState } from 'react';
-import { signIn } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -14,14 +14,23 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { error: authError } = await signIn(email, password);
+      const sb = getSupabase();
+      // Always sign out first to clear any existing session
+      await sb.auth.signOut();
+
+      const { data, error: authError } = await sb.auth.signInWithPassword({ email, password });
       if (authError) {
         setError(authError.message);
         setLoading(false);
-      } else {
-        // Hard redirect so cookies are sent with the next request
-        window.location.href = '/dashboard';
+        return;
       }
+
+      // Store the user ID in sessionStorage so AppShell can verify it
+      if (data.user) {
+        sessionStorage.setItem('sv_uid', data.user.id);
+      }
+
+      window.location.href = '/dashboard';
     } catch (err: any) {
       setError(err.message ?? 'Login failed');
       setLoading(false);
@@ -45,7 +54,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@stayvista.com"
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@stayvista.com"
               style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 10, fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' }} required />
           </div>
           <div style={{ marginBottom: 8 }}>
