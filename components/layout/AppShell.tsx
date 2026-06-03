@@ -71,73 +71,13 @@ const roleBadgeStyle: Record<string, { bg: string; color: string }> = {
   trainer:     { bg: 'rgba(151,196,89,0.15)', color: '#97C459' },
 };
 
-async function getSessionUser(): Promise<AppUser | null> {
-  try {
-    // Create a fresh client to avoid cached tokens
-    const { createClient } = await import('@supabase/supabase-js');
-    const sb = createClient(
-      'https://ryuxwnbrdsjwzwdimynd.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzOTkxNTgsImV4cCI6MjA5NTk3NTE1OH0.fhv7K_QqLsPXQdJazgF6sf1upjt5WFeLRGfH5r8oAzQ',
-      { auth: { persistSession: true, storageKey: 'sb-session' } }
-    );
-
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session?.user) return null;
-
-    const authUser = session.user;
-    console.log('[AppShell] session user:', authUser.email, authUser.id);
-
-    const { data: profile } = await sb
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .maybeSingle();
-
-    if (profile) {
-      console.log('[AppShell] profile found:', profile.name, profile.role);
-      return {
-        id: authUser.id,
-        name: profile.name,
-        email: profile.email ?? authUser.email ?? '',
-        role: profile.role as AppRole,
-        squad: profile.squad,
-        initials: profile.name.slice(0, 2).toUpperCase(),
-      };
-    }
-
-    if (authUser.email) {
-      const { data: byEmail } = await sb
-        .from('profiles')
-        .select('*')
-        .eq('email', authUser.email)
-        .maybeSingle();
-
-      if (byEmail) {
-        console.log('[AppShell] profile by email:', byEmail.name, byEmail.role);
-        return {
-          id: authUser.id,
-          name: byEmail.name,
-          email: byEmail.email ?? authUser.email,
-          role: byEmail.role as AppRole,
-          squad: byEmail.squad,
-          initials: byEmail.name.slice(0, 2).toUpperCase(),
-        };
-      }
-    }
-
-    return null;
-  } catch (e) {
-    console.error('getSessionUser:', e);
-    return null;
-  }
-}
-
 function Sidebar({ user }: { user: AppUser | null }) {
   const pathname = usePathname();
   const nav = getNav(user?.role ?? 'butler');
   const badge = user ? (roleBadgeStyle[user.role] ?? roleBadgeStyle.butler) : null;
 
   async function handleLogout() {
+    localStorage.removeItem('sv_profile');
     await getSupabase().auth.signOut();
     window.location.href = '/login';
   }
@@ -204,27 +144,53 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAuthPage) { setReady(true); return; }
 
-    // Verify session matches the user who just logged in
-    getSessionUser().then(u => {
-      const expectedUid = sessionStorage.getItem("sv_uid");
-      if (expectedUid && u && u.id !== expectedUid) {
-        // Session mismatch — force reload the correct user
-        getSupabase().auth.getSession().then(({ data }) => {
-          if (data.session?.user.id !== expectedUid) {
-            window.location.href = "/login";
-          }
-        });
-      }
-      setUser(u);
-      setReady(true);
-    });
+    // Read profile stored at login time — this is always the correct user
+    const stored = localStorage.getItem('sv_profile');
+    if (stored) {
+      try {
+        const profile = JSON.parse(stored);
+        setUser(profile);
+        setReady(true);
+        return;
+      } catch {}
+    }
 
-    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
+    // Fallback — fetch from Supabase if no localStorage entry
+    async function fetchFromSupabase() {
+      try {
+        const sb = getSupabase();
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session?.user) { setReady(true); return; }
+
+        const { data: profile } = await sb
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profile) {
+          const u: AppUser = {
+            id: session.user.id,
+            name: profile.name,
+            email: profile.email ?? session.user.email ?? '',
+            role: profile.role as AppRole,
+            squad: profile.squad,
+            initials: profile.name.slice(0, 2).toUpperCase(),
+          };
+          localStorage.setItem('sv_profile', JSON.stringify(u));
+          setUser(u);
+        }
+      } catch {}
+      setReady(true);
+    }
+    fetchFromSupabase();
+
+    // Listen for sign out
+    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('sv_profile');
         setUser(null);
         window.location.href = '/login';
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        getSessionUser().then(setUser);
       }
     });
 
@@ -253,4 +219,3 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-// force redeploy Wed Jun  3 14:16:24 UTC 2026
