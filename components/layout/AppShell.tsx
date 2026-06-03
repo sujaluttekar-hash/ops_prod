@@ -3,13 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getCurrentUser, getRoleLabel, type AppUser } from '@/lib/auth';
+import { getRoleLabel, type AppRole, type AppUser } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
 
 const adminNav = [
-  { section: 'Overview', items: [
-    { href: '/dashboard', icon: '▣', label: 'Dashboard' },
-  ]},
+  { section: 'Overview', items: [{ href: '/dashboard', icon: '▣', label: 'Dashboard' }]},
   { section: 'Operations', items: [
     { href: '/delight',    icon: '♡', label: 'Guest delight' },
     { href: '/allocation', icon: '◧', label: 'Allocation' },
@@ -29,9 +27,7 @@ const adminNav = [
 ];
 
 const supervisorNav = [
-  { section: 'Overview', items: [
-    { href: '/dashboard', icon: '▣', label: 'Dashboard' },
-  ]},
+  { section: 'Overview', items: [{ href: '/dashboard', icon: '▣', label: 'Dashboard' }]},
   { section: 'Operations', items: [
     { href: '/delight',    icon: '♡', label: 'Delight records' },
     { href: '/allocation', icon: '◧', label: 'Allocation' },
@@ -43,9 +39,7 @@ const supervisorNav = [
     { href: '/training', icon: '◈', label: 'Training' },
     { href: '/quiz',     icon: '?', label: 'Quizzes' },
   ]},
-  { section: 'Reports', items: [
-    { href: '/reports', icon: '↗', label: 'Reports' },
-  ]},
+  { section: 'Reports', items: [{ href: '/reports', icon: '↗', label: 'Reports' }]},
 ];
 
 const butlerNav = [
@@ -77,6 +71,49 @@ const roleBadgeStyle: Record<string, { bg: string; color: string }> = {
   trainer:     { bg: 'rgba(151,196,89,0.15)', color: '#97C459' },
 };
 
+async function loadUserFromSession(): Promise<AppUser | null> {
+  try {
+    const sb = getSupabase();
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return null;
+
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile) {
+      // Try by email
+      const { data: byEmail } = await sb
+        .from('profiles')
+        .select('*')
+        .eq('email', user.email ?? '')
+        .single();
+      if (!byEmail) return null;
+      return {
+        id: user.id,
+        name: byEmail.name,
+        email: byEmail.email ?? user.email ?? '',
+        role: byEmail.role as AppRole,
+        squad: byEmail.squad,
+        initials: byEmail.name.slice(0, 2).toUpperCase(),
+      };
+    }
+
+    return {
+      id: user.id,
+      name: profile.name,
+      email: profile.email ?? user.email ?? '',
+      role: profile.role as AppRole,
+      squad: profile.squad,
+      initials: profile.name.slice(0, 2).toUpperCase(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function Sidebar({ user }: { user: AppUser | null }) {
   const pathname = usePathname();
   const nav = getNav(user?.role ?? 'butler');
@@ -89,7 +126,6 @@ function Sidebar({ user }: { user: AppUser | null }) {
 
   return (
     <nav style={{ width: 228, background: '#141618', display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto', height: '100vh' }}>
-      {/* Brand */}
       <div style={{ padding: '20px 20px 14px', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #9CCCFC, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#1B1D1F' }}>S</div>
@@ -100,52 +136,42 @@ function Sidebar({ user }: { user: AppUser | null }) {
         </div>
       </div>
 
-      {/* Nav items — only render once user is loaded */}
       <div style={{ flex: 1, paddingBottom: 8 }}>
-        {!user ? (
-          <div style={{ padding: '20px 16px', color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>Loading…</div>
-        ) : (
-          nav.map(section => (
-            <div key={section.section}>
-              <div className="section-label">{section.section}</div>
-              {section.items.map(item => (
-                <Link key={item.href} href={item.href}
-                  className={`nav-item ${pathname === item.href ? 'active' : ''}`}
-                  style={{ textDecoration: 'none' }}>
-                  <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          ))
-        )}
+        {nav.map(section => (
+          <div key={section.section}>
+            <div className="section-label">{section.section}</div>
+            {section.items.map(item => (
+              <Link key={item.href} href={item.href}
+                className={`nav-item ${pathname === item.href ? 'active' : ''}`}
+                style={{ textDecoration: 'none' }}>
+                <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        ))}
       </div>
 
-      {/* User footer */}
       <div style={{ padding: '12px 16px', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
-        {user ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #FED5A9, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#1B1D1F', flexShrink: 0 }}>
-              {user.initials}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.name}
-              </div>
-              {badge && (
-                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: badge.bg, color: badge.color, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 3, display: 'inline-block' }}>
-                  {getRoleLabel(user.role)}
-                </span>
-              )}
-            </div>
-            <button onClick={handleLogout} title="Sign out"
-              style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-              ⏻
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #FED5A9, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#1B1D1F', flexShrink: 0 }}>
+            {user?.initials ?? '??'}
           </div>
-        ) : (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>Loading session…</div>
-        )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.name ?? '—'}
+            </div>
+            {badge && (
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: badge.bg, color: badge.color, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 3, display: 'inline-block' }}>
+                {getRoleLabel(user!.role)}
+              </span>
+            )}
+          </div>
+          <button onClick={handleLogout} title="Sign out"
+            style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+            ⏻
+          </button>
+        </div>
       </div>
     </nav>
   );
@@ -160,24 +186,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAuthPage) { setReady(true); return; }
 
-    // Load user immediately
-    getCurrentUser().then(u => { setUser(u); setReady(true); });
+    // Always load fresh from Supabase auth
+    loadUserFromSession().then(u => {
+      setUser(u);
+      setReady(true);
+    });
 
-    // Also listen for auth state changes (catches login/logout in other tabs)
-    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        getCurrentUser().then(setUser);
-      } else {
+    // Re-load on any auth state change
+    const { data: { subscription } } = getSupabase().auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
         setUser(null);
+        window.location.href = '/login';
+      } else {
+        loadUserFromSession().then(setUser);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [isAuthPage, pathname]);
+  }, [isAuthPage]);
 
   if (isAuthPage) return <>{children}</>;
 
-  // Don't render sidebar until we know who the user is
   if (!ready) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#141618' }}>
       <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Loading…</div>
@@ -188,8 +217,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar user={user} />
       <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-        {/* Butler context banner */}
-        {ready && user?.role === 'butler' && (
+        {user?.role === 'butler' && (
           <div style={{ background: 'rgba(156,204,252,0.08)', borderBottom: '0.5px solid rgba(156,204,252,0.15)', padding: '6px 20px', fontSize: 12, color: '#9CCCFC', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>👤</span> {user.name} · {user.squad ?? 'No squad assigned'}
           </div>
