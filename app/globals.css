@@ -211,3 +211,63 @@ body {
   border-bottom: 0.5px solid rgba(0,0,0,0.05);
 }
 .cred-row:last-child { border-bottom: none; }
+
+/* ── Mobile responsive ─────────────────────────────── */
+@media (max-width: 768px) {
+  /* Content padding */
+  .page-enter > div:first-child,
+  [style*="padding: 24"] {
+    padding: 16px !important;
+  }
+
+  /* Metric cards — 2 col on mobile */
+  .metric-card {
+    padding: 14px !important;
+  }
+
+  /* Tables scroll */
+  .sv-table th, .sv-table td {
+    padding: 10px 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* Cards */
+  .sv-card {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Topbar on desktop — hide on mobile (replaced by mobile-topbar) */
+  .topbar {
+    display: none !important;
+  }
+
+  /* Modals full screen on mobile */
+  [style*="maxWidth: 640"],
+  [style*="maxWidth: 580"],
+  [style*="maxWidth: 480"],
+  [style*="maxWidth: 500"],
+  [style*="maxWidth: 460"] {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px !important;
+  }
+
+  /* Grid — single column on small screens */
+  [style*="gridTemplateColumns: repeat(auto-fit"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Photo cells smaller on mobile */
+  .upload-zone {
+    padding: 20px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .sv-table {
+    font-size: 11px !important;
+  }
+  .sv-table th, .sv-table td {
+    padding: 8px 8px !important;
+  }
+}
