@@ -101,18 +101,26 @@ function ButlerDashboard({ user }: { user: AppUser }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [huddles, setHuddles] = useState<any[]>([]);
   const [myDelights, setMyDelights] = useState<any[]>([]);
+  const [pendingQuizzes, setPendingQuizzes] = useState<any[]>([]);
 
   useEffect(() => {
     async function load() {
       const sb = getSupabase();
-      const [t, n, h, d] = await Promise.all([
+      const [t, n, h, d, hq, ha] = await Promise.all([
         fetchTrainings(),
         sb.from('notifications').select('*').eq('user_id', user.id).eq('read', false).order('created_at', { ascending: false }),
         sb.from('huddles').select('*').gte('huddle_date', new Date().toISOString().split('T')[0]).order('huddle_date').limit(3),
         sb.from('guest_delights').select('*').eq('your_name', user.name).order('booking_date', { ascending: false }).limit(5),
+        sb.from('huddle_quiz_questions').select('huddle_id'),
+        sb.from('huddle_quiz_attempts').select('huddle_id').eq('butler_id', user.id),
       ]);
       setTrainings(t);
       setNotifications(n.data ?? []);
+      // Add pending quiz notifications
+      const doneHuddleIds = new Set((ha.data ?? []).map((a: any) => a.huddle_id));
+      const quizHuddleIds = new Set((hq.data ?? []).map((q: any) => q.huddle_id));
+      const pendingQuizzes = (h.data ?? []).filter((hd: any) => quizHuddleIds.has(hd.id) && !doneHuddleIds.has(hd.id));
+      setPendingQuizzes(pendingQuizzes);
       setHuddles(h.data ?? []);
       setMyDelights(d.data ?? []);
       setLoading(false);
@@ -147,19 +155,31 @@ function ButlerDashboard({ user }: { user: AppUser }) {
             Notifications {notifications.length > 0 && <span className="badge badge-coral" style={{ marginLeft: 6 }}>{notifications.length} new</span>}
           </div>
           {loading ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>Loading…</div> :
-            notifications.length === 0
+            notifications.length === 0 && pendingQuizzes.length === 0
               ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>You're all caught up! No new notifications.</div>
-              : notifications.map(n => (
-                <div key={n.id} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
-                  <span style={{ fontSize: 18, flexShrink: 0 }}>
-                    {n.type === 'huddle' ? '◎' : n.type === 'training' ? '◈' : n.type === 'task' ? '✓' : '🔔'}
-                  </span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{n.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{n.body}</div>
+              : <>
+                {pendingQuizzes.map((h: any) => (
+                  <div key={h.id} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)', alignItems: 'center' }}>
+                    <span style={{ fontSize: 18, flexShrink: 0 }}>📝</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>Quiz pending: {h.team}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{new Date(h.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+                    </div>
+                    <a href={`/huddle-quiz?huddle=${h.id}`} className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '4px 10px', textDecoration: 'none' }}>Take quiz</a>
                   </div>
-                </div>
-              ))
+                ))}
+                {notifications.map(n => (
+                  <div key={n.id} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
+                    <span style={{ fontSize: 18, flexShrink: 0 }}>
+                      {n.type === 'huddle' ? '◎' : n.type === 'training' ? '◈' : n.type === 'task' ? '✓' : '🔔'}
+                    </span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{n.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{n.body}</div>
+                    </div>
+                  </div>
+                ))}
+              </>
           }
         </div>
 

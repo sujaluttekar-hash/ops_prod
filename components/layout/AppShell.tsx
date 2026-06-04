@@ -15,7 +15,8 @@ const adminNav = [
     { href: '/roster',     icon: '▦', label: 'Roster' },
   ]},
   { section: 'Learning', items: [
-    { href: '/huddle',   icon: '◎', label: 'Huddles' },
+    { href: '/huddle',      icon: '◎', label: 'Huddles' },
+    { href: '/huddle-quiz', icon: '📝', label: 'Take quiz' },
     { href: '/training', icon: '◈', label: 'Training' },
     { href: '/quiz',     icon: '?', label: 'Quizzes' },
   ]},
