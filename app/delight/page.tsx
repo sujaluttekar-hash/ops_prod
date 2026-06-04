@@ -67,9 +67,17 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
       const { data, error: insertErr } = await insertGuestDelight({ your_name: form.your_name, squad: form.squad, booking_date: form.booking_date, booking_id: form.booking_id || null, villa_name: form.villa_name, booking_type: form.booking_type, status: 'pending' });
       if (insertErr) throw new Error(insertErr.message);
       if (data?.id) {
+        let uploadCount = 0;
         for (const p of PHOTO_POINTERS) {
           const photo = photos[p.key];
-          if (photo) await uploadDelightPhoto(data.id, p.key, photo.file, photo.timestamp);
+          if (photo) {
+            const { error: upErr } = await uploadDelightPhoto(data.id, p.key, photo.file, photo.timestamp);
+            if (!upErr) uploadCount++;
+          }
+        }
+        // Auto-complete if all 7 photos uploaded
+        if (uploadCount === PHOTO_POINTERS.length) {
+          await getSupabase().from('guest_delights').update({ status: 'completed' }).eq('id', data.id);
         }
       }
       setSaved(true);
@@ -181,7 +189,10 @@ function PhotoReviewModal({ entry, onClose, onApprove }: { entry: GuestDelight; 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 24 }}>
           {PHOTO_POINTERS.map(ptr => {
             const photo = photos.find(p => p.pointer_key === ptr.key);
-            const url = photo?.public_url ?? (photo?.storage_path ? sb.storage.from(BUCKETS.DELIGHT_PHOTOS).getPublicUrl(photo.storage_path).data.publicUrl : null);
+            const url = photo?.public_url 
+              ?? (photo?.storage_path 
+                ? `https://ryuxwnbrdsjwzwdimynd.supabase.co/storage/v1/object/public/delight-photos/${photo.storage_path}`
+                : null);
             return (
               <div key={ptr.key} style={{ borderRadius: 10, overflow: 'hidden', border: `1.5px solid ${photo ? '#97C459' : 'rgba(0,0,0,0.08)'}`, background: photo ? '#fff' : 'var(--muted)' }}>
                 {url ? (
