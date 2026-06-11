@@ -145,6 +145,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
   const [completeTask, setCompleteTask] = useState<any | null>(null);
+  const [viewPhoto, setViewPhoto] = useState<string | null>(null);
 
   const isSuper = user ? isSupervisor(user.role as any) : false;
 
@@ -191,6 +192,18 @@ export default function TasksPage() {
 
   return (
     <>
+      {/* Photo lightbox */}
+      {viewPhoto && (
+        <div onClick={() => setViewPhoto(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ position: 'relative', maxWidth: 500, width: '100%' }}>
+            <img src={viewPhoto} alt="Task proof" style={{ width: '100%', borderRadius: 12, maxHeight: '80vh', objectFit: 'contain' }} />
+            <button onClick={() => setViewPhoto(null)} style={{ position: 'absolute', top: -12, right: -12, width: 32, height: 32, borderRadius: '50%', background: '#fff', border: 'none', fontSize: 16, cursor: 'pointer', fontWeight: 700 }}>✕</button>
+            <a href={viewPhoto} download target="_blank" rel="noreferrer">
+              <button style={{ position: 'absolute', bottom: -14, left: '50%', transform: 'translateX(-50%)', background: '#1B1D1F', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, cursor: 'pointer' }}>⬇ Download photo</button>
+            </a>
+          </div>
+        </div>
+      )}
       {completeTask && <CompleteTaskModal task={completeTask} onClose={() => setCompleteTask(null)} onDone={(taskId) => {
         // Immediately update local state so UI reflects completion
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'completed' as any } : t));
@@ -304,7 +317,17 @@ export default function TasksPage() {
                               Complete task
                             </button>
                           ) : t.status === 'completed' ? (
-                            <span style={{ fontSize: 12, color: '#2D5A0E', fontWeight: 600 }}>✅ Done</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 12, color: '#2D5A0E', fontWeight: 600 }}>✅ Done</span>
+                              {(t as any).photo_path && (
+                                <img
+                                  src={(t as any).photo_path}
+                                  alt="proof"
+                                  onClick={() => setViewPhoto((t as any).photo_path)}
+                                  style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 5, cursor: 'pointer', border: '1.5px solid #97C459' }}
+                                />
+                              )}
+                            </div>
                           ) : (
                             <span style={{ fontSize: 12, color: '#8B2020' }}>⚠ Delayed</span>
                           )}
