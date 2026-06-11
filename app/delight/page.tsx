@@ -22,7 +22,9 @@ type PhotoMap = Record<string, PhotoVal>;
 
 // ── Photo upload cell ────────────────────────────────────────
 function PhotoCell({ pointer, value, onChange }: { pointer: typeof PHOTO_POINTERS[0]; value: PhotoVal; onChange: (v: PhotoVal) => void }) {
-  const ref = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
@@ -30,22 +32,37 @@ function PhotoCell({ pointer, value, onChange }: { pointer: typeof PHOTO_POINTER
     reader.onload = ev => onChange({ file, preview: ev.target?.result as string, timestamp: ts });
     reader.readAsDataURL(file);
   }
+
   return (
-    <div style={{ border: `1.5px dashed ${value ? '#97C459' : 'rgba(0,0,0,0.13)'}`, borderRadius: 10, padding: value ? 8 : 14, background: value ? 'rgba(151,196,89,0.05)' : 'transparent', cursor: 'pointer', minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, textAlign: 'center', transition: 'all 0.15s' }}
-      onClick={() => ref.current?.click()}>
-      <input ref={ref} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
+    <div style={{ border: `1.5px dashed ${value ? '#97C459' : 'rgba(0,0,0,0.13)'}`, borderRadius: 10, padding: value ? 8 : 12, background: value ? 'rgba(151,196,89,0.05)' : 'transparent', minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', transition: 'all 0.15s' }}>
+      {/* Hidden inputs */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
+      <input ref={galleryRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+
       {value ? (
         <>
           <img src={value.preview} alt="" style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 7 }} />
           <div style={{ fontSize: 10, color: '#2D5A0E', fontWeight: 600 }}>✓ {value.timestamp}</div>
-          <button type="button" onClick={e => { e.stopPropagation(); onChange(null); }} style={{ fontSize: 10, color: '#8B2020', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+          <button type="button" onClick={() => onChange(null)} style={{ fontSize: 10, color: '#8B2020', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Remove</button>
         </>
       ) : (
         <>
           <div style={{ fontSize: 22 }}>{pointer.emoji}</div>
           <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>{pointer.label}</div>
           {pointer.note && <div style={{ fontSize: 10, color: 'var(--muted-fg)' }}>{pointer.note}</div>}
-          <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 2 }}>Tap to upload</div>
+          {/* Two upload options */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            <button type="button"
+              onClick={() => cameraRef.current?.click()}
+              style={{ fontSize: 11, padding: '5px 10px', background: '#1B1D1F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+              📷 Camera
+            </button>
+            <button type="button"
+              onClick={() => galleryRef.current?.click()}
+              style={{ fontSize: 11, padding: '5px 10px', background: 'var(--muted)', color: 'var(--sv-dark)', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+              🖼 Gallery
+            </button>
+          </div>
         </>
       )}
     </div>
