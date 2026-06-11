@@ -149,25 +149,17 @@ export default function TasksPage() {
   const isSuper = user ? isSupervisor(user.role as any) : false;
 
   async function loadForUser(u: { id: string; name: string; role: string }) {
-    const sb = getServiceSupabase();
     const supervisor = isSupervisor(u.role as any);
-    if (!supervisor) {
-      const { data: allTasks } = await sb
-        .from('tasks').select('*, profiles(name)')
-        .order('created_at', { ascending: false });
-      if (allTasks) {
-        const mine = allTasks.filter((t: any) =>
-          t.butler_id === u.id ||
-          (t.notes && t.notes.includes('ButlerID: ' + u.id)) ||
-          (t.notes && t.notes.includes('Butler: ' + u.name))
-        );
-        setTasks(mine as any);
-      }
-    } else {
-      const { data } = await sb
-        .from('tasks').select('*, profiles(name)')
-        .order('created_at', { ascending: false });
-      setTasks((data || []) as any);
+    try {
+      // Use server-side API route — guaranteed to work regardless of client-side Supabase state
+      const url = supervisor
+        ? '/api/tasks?all=1'
+        : `/api/tasks?uid=${encodeURIComponent(u.id)}&name=${encodeURIComponent(u.name)}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+      if (Array.isArray(data)) setTasks(data as any);
+    } catch (e) {
+      console.error('Tasks fetch error:', e);
     }
     setLoading(false);
   }
