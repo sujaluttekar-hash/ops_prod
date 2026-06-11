@@ -221,6 +221,46 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   );
 }
 
+
+// ── Butler self-attend button ─────────────────────────────────
+function ButlerAttendButton({ huddleId, butlerId }: { huddleId: string; butlerId: string }) {
+  const [attended, setAttended] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getServiceSupabase()
+      .from('huddle_attendance')
+      .select('attended')
+      .eq('huddle_id', huddleId)
+      .eq('butler_id', butlerId)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        setAttended(data?.attended ?? false);
+      });
+  }, [huddleId, butlerId]);
+
+  async function toggle() {
+    setSaving(true);
+    const newVal = !attended;
+    await getServiceSupabase()
+      .from('huddle_attendance')
+      .upsert({ huddle_id: huddleId, butler_id: butlerId, attended: newVal }, { onConflict: 'huddle_id,butler_id' });
+    setAttended(newVal);
+    setSaving(false);
+  }
+
+  if (attended === null) return null;
+  return (
+    <button
+      className="sv-btn"
+      style={{ fontSize: 11, padding: '3px 10px', background: attended ? 'rgba(151,196,89,0.15)' : undefined, color: attended ? '#2D5A0E' : undefined, borderColor: attended ? '#97C459' : undefined }}
+      onClick={toggle}
+      disabled={saving}>
+      {saving ? '…' : attended ? '✅ Attended' : '◎ Mark me present'}
+    </button>
+  );
+}
+
 // ── Attendance Modal ──────────────────────────────────────────
 function AttendanceModal({ huddle, profiles, onClose, onSaved }: { huddle: HuddleWithStats; profiles: Profile[]; onClose: () => void; onSaved: () => void }) {
   const [attended, setAttended] = useState<Set<string>>(new Set());
@@ -508,6 +548,16 @@ export default function HuddlePage() {
                           <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <span className={getStatusBadge(h.status)}>{getStatusLabel(h.status)}</span>
                             {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => setAttendanceHuddle(h)}>Mark attendance</button>}
+                            {!isSuper && user && (
+                              <ButlerAttendButton huddleId={h.id} butlerId={user.id} />
+                            )}
+                            {h.hasQuiz && (
+                              <a href={`/huddle-quiz?huddle=${h.id}`} style={{ textDecoration: 'none' }}>
+                                <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '3px 10px', background: '#97C459', border: 'none' }}>
+                                  📝 Take quiz
+                                </button>
+                              </a>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -572,6 +622,11 @@ export default function HuddlePage() {
                               <div style={{ display: 'flex', gap: 6 }}>
                                 {isSuper && h.status !== 'completed' && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setAttendanceHuddle(h)}>Attendance</button>}
                                 {h.hasQuiz && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setScoresHuddle(h)}>Scores</button>}
+                                {h.hasQuiz && !isSuper && (
+                                  <a href={`/huddle-quiz?huddle=${h.id}`} style={{ textDecoration: 'none' }}>
+                                    <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '4px 8px', background: '#97C459', border: 'none', color: '#fff' }}>📝 Take quiz</button>
+                                  </a>
+                                )}
                                 {isSuper && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px', color: '#8B2020', borderColor: '#E9A0A7' }}
                                   onClick={async () => { if (confirm('Delete this huddle?')) { await getServiceSupabase().from('huddles').delete().eq('id', h.id); load(); } }}>
                                   ✕
