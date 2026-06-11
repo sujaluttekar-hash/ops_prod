@@ -64,13 +64,18 @@ function AssignTaskModal({
     e.preventDefault();
     setSaving(true); setError('');
     try {
+      const notesText = [
+        form.property_id ? `Villa: ${form.property_id}` : '',
+        form.notes || '',
+      ].filter(Boolean).join(' · ');
+
       const { error: err } = await getServiceSupabase().from('tasks').insert({
         type: form.task_type || form.booking_type,
         butler_id: butler.id,
-        property_id: form.property_id || null,
+        property_id: null,
         status: 'pending',
         due_time: form.due_time || null,
-        notes: form.notes || null,
+        notes: notesText || null,
         created_at: `${date}T${form.due_time || '08:00'}:00`,
       });
       if (err) throw new Error(err.message);
@@ -79,7 +84,7 @@ function AssignTaskModal({
       getServiceSupabase().from('notifications').insert({
         user_id: butler.id,
         title: 'New task assigned',
-        message: `You have been assigned: ${form.task_type || form.booking_type}${form.property_id ? ' at ' + form.property_id : ''}${form.due_time ? ' · Due ' + form.due_time : ''}`,
+        message: `You have been assigned: ${form.task_type || form.booking_type}${form.property_id ? ' at ' + form.property_id : ''}${form.due_time ? ' · Due ' + form.due_time : ''}${form.notes ? ' · ' + form.notes : ''}`,
         type: 'info',
         read: false,
       }).then(() => {}).catch(() => {});

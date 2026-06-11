@@ -145,7 +145,7 @@ export default function TasksPage() {
                           </td>
                         )}
                         <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>
-                          {tAny.properties?.name ?? (t.property_id || '—')}
+                          {t.notes ? t.notes.split(' · ')[0].replace('Villa: ', '') : '—'}
                         </td>
                         <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{t.due_time ?? '—'}</td>
                         <td><span className={getStatusBadge(t.status)}>{getStatusLabel(t.status)}</span></td>
