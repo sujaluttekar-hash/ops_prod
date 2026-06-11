@@ -78,12 +78,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const sb = getSupabase()
       const { data: { subscription } } = sb.auth.onAuthStateChange(async (event: any, session: any) => {
-        if (!session?.user) {
+        // Only act on Supabase SIGNED_OUT event - don't clear local session just because
+        // Supabase has no session (we use localStorage-based auth, not Supabase auth)
+        if (event === 'SIGNED_OUT') {
           localStorage.removeItem('sv_local_session')
           setUser(null)
           setLoading(false)
           return
         }
+        if (!session?.user) return // ignore — local session still valid
         try {
           const { data } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
           if (data) {
