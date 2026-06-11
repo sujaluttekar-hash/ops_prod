@@ -12,7 +12,7 @@ export async function GET(req: Request) {
 
   // Fetch all tasks via REST API (server-side — guaranteed service key access)
   const res = await fetch(
-    `${SURL}/rest/v1/tasks?select=*,profiles(name)&order=created_at.desc`,
+    `${SURL}/rest/v1/tasks?select=*&order=created_at.desc`,
     { headers: H, cache: 'no-store' }
   )
   const tasks = await res.json()
