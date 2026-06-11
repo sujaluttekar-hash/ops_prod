@@ -104,33 +104,13 @@ function AssignTaskModal({
           <form onSubmit={handleSave}>
             {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
 
-            {/* Booking type — 4 options */}
+            {/* Booking type — dropdown */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Booking type *</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                {BOOKING_TYPES.map(bt => {
-                  const c = BOOKING_TYPE_COLORS[bt];
-                  const active = form.booking_type === bt;
-                  return (
-                    <button key={bt} type="button"
-                      onClick={() => setForm(f => ({ ...f, booking_type: bt }))}
-                      style={{
-                        padding: '10px 8px',
-                        borderRadius: 10,
-                        border: `1.5px solid ${active ? c.color : 'rgba(0,0,0,0.1)'}`,
-                        background: active ? c.bg : 'white',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        fontSize: 13,
-                        fontWeight: active ? 700 : 400,
-                        color: active ? c.color : 'var(--sv-dark)',
-                        transition: 'all 0.15s',
-                      }}>
-                      {bt}
-                    </button>
-                  );
-                })}
-              </div>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Booking type *</div>
+              <select className="sv-select" style={{ width: '100%' }} value={form.booking_type}
+                onChange={e => setForm(f => ({ ...f, booking_type: e.target.value as any }))}>
+                {BOOKING_TYPES.map(bt => <option key={bt} value={bt}>{bt}</option>)}
+              </select>
             </div>
 
             {/* Task type */}
@@ -182,17 +162,39 @@ function ButlerDetailRow({ alloc, onAssign }: { alloc: ButlerAllocation; onAssig
     <tr>
       <td colSpan={8} style={{ background: 'rgba(0,0,0,0.018)', padding: 0 }}>
         <div style={{ padding: '16px 20px' }}>
-          {alloc.tasks.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ fontSize: 13, color: 'var(--muted-fg)' }}>No tasks assigned for this date.</div>
-              <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={onAssign}>Assign task</button>
-            </div>
-          ) : (
+          {/* Always show two action buttons at top */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: alloc.tasks.length > 0 ? 14 : 0 }}>
+            <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={onAssign}>
+              + Assign task
+            </button>
+            <select className="sv-select" style={{ fontSize: 12, padding: '6px 10px' }}
+              onChange={async e => {
+                const bt = e.target.value;
+                if (!bt) return;
+                e.target.value = '';
+                // Quick-assign booking type as a task
+                await getServiceSupabase().from('tasks').insert({
+                  type: bt,
+                  butler_id: alloc.id,
+                  status: 'pending',
+                  created_at: new Date().toISOString(),
+                });
+                onAssign();
+              }}>
+              <option value="">Set booking type…</option>
+              {BOOKING_TYPES.map(bt => <option key={bt} value={bt}>{bt}</option>)}
+            </select>
+            {alloc.tasks.length === 0 && (
+              <div style={{ fontSize: 13, color: 'var(--muted-fg)' }}>No tasks assigned yet.</div>
+            )}
+          </div>
+
+          {alloc.tasks.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
                 Task breakdown
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {alloc.tasks.map((t: any, i: number) => (
                   <div key={i} style={{ background: t.status === 'completed' ? 'rgba(151,196,89,0.12)' : t.status === 'delayed' ? 'rgba(226,75,74,0.08)' : 'var(--muted)', borderRadius: 8, padding: '8px 12px', fontSize: 12, border: `0.5px solid ${t.status === 'completed' ? '#97C459' : t.status === 'delayed' ? '#E9A0A7' : 'rgba(0,0,0,0.08)'}` }}>
                     <div style={{ fontWeight: 600, marginBottom: 2 }}>{TASK_EMOJIS[t.type] || '✓'} {t.type}</div>
@@ -200,7 +202,6 @@ function ButlerDetailRow({ alloc, onAssign }: { alloc: ButlerAllocation; onAssig
                   </div>
                 ))}
               </div>
-              <button className="sv-btn sv-btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} onClick={onAssign}>+ Assign another task</button>
             </div>
           )}
         </div>
