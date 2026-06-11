@@ -74,6 +74,16 @@ function AssignTaskModal({
         created_at: `${date}T${form.due_time || '08:00'}:00`,
       });
       if (err) throw new Error(err.message);
+
+      // Send notification to the butler
+      getServiceSupabase().from('notifications').insert({
+        user_id: butler.id,
+        title: 'New task assigned',
+        message: `You have been assigned: ${form.task_type || form.booking_type}${form.property_id ? ' at ' + form.property_id : ''}${form.due_time ? ' · Due ' + form.due_time : ''}`,
+        type: 'info',
+        read: false,
+      }).then(() => {}).catch(() => {});
+
       setSaved(true);
       setTimeout(() => { onSaved(); onClose(); }, 800);
     } catch (err: any) { setError(err.message); setSaving(false); }
@@ -175,6 +185,14 @@ function ButlerDetailRow({ alloc, onAssign }: { alloc: ButlerAllocation; onAssig
                   status: 'pending',
                   created_at: new Date().toISOString(),
                 });
+                // Notify butler
+                getServiceSupabase().from('notifications').insert({
+                  user_id: alloc.id,
+                  title: 'New task assigned',
+                  message: `You have been assigned: ${bt}`,
+                  type: 'info',
+                  read: false,
+                }).then(() => {}).catch(() => {});
                 onAssign();
               }}>
               <option value="">Booking type…</option>

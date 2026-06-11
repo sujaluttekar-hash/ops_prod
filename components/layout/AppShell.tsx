@@ -1,9 +1,9 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, getServiceSupabase } from '@/lib/supabase';
 
 type NavItem = { label: string; href: string; icon: string };
 type NavSection = { overview: NavItem[]; operations: NavItem[]; learning: NavItem[]; admin: NavItem[] };
@@ -70,6 +70,84 @@ const navByRole: Record<string, NavSection> = {
     admin: [],
   },
 };
+
+// ── NotificationBell component ────────────────────────────────
+function NotificationBell({ userId }: { userId: string }) {
+  const [notifs, setNotifs] = useState<any[]>([])
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!userId) return
+    getServiceSupabase()
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('read', false)
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }: any) => setNotifs(data || []))
+
+    // Poll every 30s
+    const interval = setInterval(() => {
+      getServiceSupabase()
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('read', false)
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .then(({ data }: any) => setNotifs(data || []))
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [userId])
+
+  async function markAllRead() {
+    await getServiceSupabase()
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', userId)
+      .eq('read', false)
+    setNotifs([])
+    setOpen(false)
+  }
+
+  return (
+    <div style={{ position: 'relative', marginBottom: 6 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 7, color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>🔔 Notifications</span>
+        {notifs.length > 0 && (
+          <span style={{ background: '#E9A0A7', color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+            {notifs.length > 9 ? '9+' : notifs.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#1e2228', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 10, marginBottom: 6, maxHeight: 280, overflowY: 'auto', zIndex: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+          <div style={{ padding: '10px 14px', borderBottom: '0.5px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Notifications</span>
+            {notifs.length > 0 && (
+              <button onClick={markAllRead} style={{ fontSize: 10, color: '#9CCCFC', background: 'none', border: 'none', cursor: 'pointer' }}>Mark all read</button>
+            )}
+          </div>
+          {notifs.length === 0 ? (
+            <div style={{ padding: '20px 14px', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>No new notifications</div>
+          ) : notifs.map((n: any) => (
+            <div key={n.id} style={{ padding: '10px 14px', borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{n.title}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{n.message}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>
+                {new Date(n.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -166,8 +244,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{roleLabel}</div>
             </div>
           </div>
+          <NotificationBell userId={user.id} />
           <button onClick={() => { localStorage.removeItem('sv_local_session'); window.location.replace('/login'); }}
-            style={{ width: '100%', padding: '7px 0', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 7, color: 'rgba(255,255,255,0.5)', fontSize: 12, cursor: 'pointer' }}>
+            style={{ width: '100%', padding: '7px 0', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 7, color: 'rgba(255,255,255,0.5)', fontSize: 12, cursor: 'pointer', marginTop: 6 }}>
             Sign out
           </button>
         </div>
