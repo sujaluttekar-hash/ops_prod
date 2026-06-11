@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase';
-import { isSupervisor } from '@/lib/auth';
 
 type NavItem = { label: string; href: string; icon: string };
 type NavSection = { overview: NavItem[]; operations: NavItem[]; learning: NavItem[]; admin: NavItem[] };
@@ -72,52 +71,35 @@ const navByRole: Record<string, NavSection> = {
   },
 };
 
-function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
-  return (
-    <Link href={item.href}>
-      <div style={{
-        padding: '8px 10px', marginBottom: 2, borderRadius: 7,
-        background: isActive ? 'rgba(156,204,252,0.18)' : 'transparent',
-        borderLeft: isActive ? '2px solid #9CCCFC' : '2px solid transparent',
-        color: isActive ? '#9CCCFC' : 'rgba(255,255,255,0.65)',
-        fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9,
-        fontWeight: isActive ? 600 : 400,
-      }}>
-        <span style={{ fontSize: 14 }}>{item.icon}</span>{item.label}
-      </div>
-    </Link>
-  );
-}
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
   const isLoginPage = pathname === '/login';
 
+  // Redirect to login only once loading is done and no user found
   useEffect(() => {
-    if (!loading && !user && !isLoginPage) router.replace('/login');
-  }, [loading, user, isLoginPage, router]);
+    if (!loading && !user && !isLoginPage) {
+      window.location.href = '/login';
+    }
+  }, [loading, user, isLoginPage]);
 
+  // Always render login page as-is
   if (isLoginPage) return <>{children}</>;
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#F7F7F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
-      <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(156,204,252,0.3)', borderTop: '2px solid #9CCCFC', animation: 'spin 0.8s linear infinite' }} />
-      <div style={{ fontSize: 13, color: '#9CA3AF' }}>Loading…</div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-
-  if (!user) return null;
+  // While loading OR no user: render children without sidebar
+  // This means dashboard content starts loading immediately, no spinner gate
+  if (loading || !user) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F7F7F5' }}>
+        {children}
+      </div>
+    );
+  }
 
   const nav = navByRole[user.role] || navByRole.butler;
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
   const roleLabel = { super_admin: 'Admin', ops_manager: 'Supervisor', trainer: 'Trainer', butler: 'Butler' }[user.role] || 'Butler';
-
-  const SectionLabel = ({ label }: { label: string }) => (
-    <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase' as const, letterSpacing: 1, marginBottom: 6, marginTop: 16, paddingLeft: 12 }}>{label}</div>
-  );
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F7F7F5' }}>
@@ -132,25 +114,48 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {nav.overview.map(item => <NavLink key={item.href} item={item} isActive={isActive(item.href)} />)}
+          {nav.overview.map(item => (
+            <Link key={item.href} href={item.href}>
+              <div style={{ padding: '8px 10px', marginBottom: 2, borderRadius: 7, background: isActive(item.href) ? 'rgba(156,204,252,0.18)' : 'transparent', borderLeft: isActive(item.href) ? '2px solid #9CCCFC' : '2px solid transparent', color: isActive(item.href) ? '#9CCCFC' : 'rgba(255,255,255,0.65)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, fontWeight: isActive(item.href) ? 600 : 400 }}>
+                <span>{item.icon}</span>{item.label}
+              </div>
+            </Link>
+          ))}
 
           {nav.operations.length > 0 && <>
-            <SectionLabel label="Operations" />
-            {nav.operations.map(item => <NavLink key={item.href} item={item} isActive={isActive(item.href)} />)}
+            <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, marginTop: 16, paddingLeft: 12 }}>Operations</div>
+            {nav.operations.map(item => (
+              <Link key={item.href} href={item.href}>
+                <div style={{ padding: '8px 10px', marginBottom: 2, borderRadius: 7, background: isActive(item.href) ? 'rgba(156,204,252,0.18)' : 'transparent', borderLeft: isActive(item.href) ? '2px solid #9CCCFC' : '2px solid transparent', color: isActive(item.href) ? '#9CCCFC' : 'rgba(255,255,255,0.65)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, fontWeight: isActive(item.href) ? 600 : 400 }}>
+                  <span>{item.icon}</span>{item.label}
+                </div>
+              </Link>
+            ))}
           </>}
 
           {nav.learning.length > 0 && <>
-            <SectionLabel label="Learning" />
-            {nav.learning.map(item => <NavLink key={item.href} item={item} isActive={isActive(item.href)} />)}
+            <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, marginTop: 16, paddingLeft: 12 }}>Learning</div>
+            {nav.learning.map(item => (
+              <Link key={item.href} href={item.href}>
+                <div style={{ padding: '8px 10px', marginBottom: 2, borderRadius: 7, background: isActive(item.href) ? 'rgba(156,204,252,0.18)' : 'transparent', borderLeft: isActive(item.href) ? '2px solid #9CCCFC' : '2px solid transparent', color: isActive(item.href) ? '#9CCCFC' : 'rgba(255,255,255,0.65)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, fontWeight: isActive(item.href) ? 600 : 400 }}>
+                  <span>{item.icon}</span>{item.label}
+                </div>
+              </Link>
+            ))}
           </>}
 
           {nav.admin.length > 0 && <>
-            <SectionLabel label="Admin" />
-            {nav.admin.map(item => <NavLink key={item.href} item={item} isActive={isActive(item.href)} />)}
+            <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, marginTop: 16, paddingLeft: 12 }}>Admin</div>
+            {nav.admin.map(item => (
+              <Link key={item.href} href={item.href}>
+                <div style={{ padding: '8px 10px', marginBottom: 2, borderRadius: 7, background: isActive(item.href) ? 'rgba(156,204,252,0.18)' : 'transparent', borderLeft: isActive(item.href) ? '2px solid #9CCCFC' : '2px solid transparent', color: isActive(item.href) ? '#9CCCFC' : 'rgba(255,255,255,0.65)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, fontWeight: isActive(item.href) ? 600 : 400 }}>
+                  <span>{item.icon}</span>{item.label}
+                </div>
+              </Link>
+            ))}
           </>}
         </div>
 
-        {/* Footer */}
         <div style={{ padding: '12px', borderTop: '0.5px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #9CCCFC, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
@@ -168,7 +173,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Main content area — light */}
       <div style={{ marginLeft: 220, flex: 1, minWidth: 0, background: '#F7F7F5', color: '#1B1D1F' }}>
         {children}
       </div>
