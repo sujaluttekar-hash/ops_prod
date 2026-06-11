@@ -64,13 +64,18 @@ function AssignTaskModal({
     e.preventDefault();
     setSaving(true); setError('');
     try {
+      // If custom task, use the notes as the task type label
+      const taskType = form.task_type === 'Custom task'
+        ? (form.notes || 'Custom task')
+        : (form.task_type || form.booking_type);
+
       const notesText = [
         form.property_id ? `Villa: ${form.property_id}` : '',
-        form.notes || '',
+        form.task_type === 'Custom task' ? '' : (form.notes || ''),
       ].filter(Boolean).join(' · ');
 
       const { error: err } = await getServiceSupabase().from('tasks').insert({
-        type: form.task_type || form.booking_type,
+        type: taskType,
         butler_id: butler.id,
         property_id: null,
         status: 'pending',

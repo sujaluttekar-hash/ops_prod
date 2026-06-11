@@ -10,3 +10,6 @@ ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_property_id_fkey;
 -- Fix 4: Rebuild indexes
 CREATE INDEX IF NOT EXISTS idx_tasks_butler ON tasks(butler_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+
+-- Fix 3: Drop the type CHECK constraint so custom task types can be stored
+ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_type_check;
