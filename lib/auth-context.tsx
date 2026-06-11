@@ -16,20 +16,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const timeout = setTimeout(() => setLoading(false), 5000)
+    const timeout = setTimeout(() => setLoading(false), 2000)
     const loadUser = async () => {
       try {
         const sb = getSupabase()
         const { data: { session } } = await sb.auth.getSession()
         if (!session?.user?.id) { setUser(null); setLoading(false); clearTimeout(timeout); return }
+        // Set loading false immediately so UI unblocks, then fetch profile
+        setLoading(false); clearTimeout(timeout)
         const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single()
         if (profile) { setUser(profile as Profile) }
         else if (session.user.email) {
           const { data: p2 } = await sb.from('profiles').select('*').eq('email', session.user.email).single()
           setUser((p2 as Profile) || null)
         }
-      } catch { setUser(null) }
-      finally { setLoading(false); clearTimeout(timeout) }
+      } catch { setUser(null); setLoading(false); clearTimeout(timeout) }
     }
     loadUser()
     const sb = getSupabase()
