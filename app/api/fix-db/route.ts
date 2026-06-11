@@ -1,71 +1,37 @@
 import { NextResponse } from 'next/server'
 
-const SUPABASE_URL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
+const URL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
+const SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
+const h = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}`, 'Content-Type': 'application/json' }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const butlerId = searchParams.get('butler') || 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2'
-  const butlerName = searchParams.get('name') || 'Kohinoor Shinde'
+export async function GET() {
+  // Get actual columns from notifications table via OPTIONS
+  const optRes = await fetch(`${URL}/rest/v1/notifications`, { method: 'GET', headers: { ...h, 'Accept': 'application/json' } })
+  const notifRows = await optRes.json()
+  const cols = notifRows.length > 0 ? Object.keys(notifRows[0]) : 'empty table'
 
-  // Test notification insert with butler profile UUID
-  const notifTest = await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
-    method: 'POST',
-    headers: {
-      'apikey': SERVICE_KEY,
-      'Authorization': `Bearer ${SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal'
-    },
-    body: JSON.stringify({
-      user_id: butlerId,
-      title: 'Test notification',
-      message: 'Testing if FK constraint is blocking notifications',
-      type: 'info',
-      read: false,
-    })
-  })
-  const notifStatus = notifTest.status
-  const notifBody = await notifTest.text()
+  // Try minimal insert - just required fields, discover what works
+  const attempts: any[] = []
+  
+  // Attempt 1: full schema
+  const r1 = await fetch(`${URL}/rest/v1/notifications`, { method: 'POST', headers: { ...h, 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ user_id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', title: 'Test', message: 'Test msg', type: 'info', read: false }) })
+  attempts.push({ attempt: 'full schema', status: r1.status, body: await r1.text() })
 
-  // Test task insert
-  const taskTest = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
-    method: 'POST',
-    headers: {
-      'apikey': SERVICE_KEY,
-      'Authorization': `Bearer ${SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal'
-    },
-    body: JSON.stringify({
-      type: 'TEST_TASK',
-      butler_id: butlerId,
-      status: 'pending',
-      notes: `Butler: ${butlerName} · ButlerID: ${butlerId} · TEST`,
-    })
-  })
-  const taskStatus = taskTest.status
-  const taskBody = await taskTest.text()
+  // Attempt 2: without type
+  const r2 = await fetch(`${URL}/rest/v1/notifications`, { method: 'POST', headers: { ...h, 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ user_id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', title: 'Test', message: 'Test msg', read: false }) })
+  attempts.push({ attempt: 'no type', status: r2.status, body: await r2.text() })
 
-  // Fetch butler tasks
-  const tasksRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/tasks?select=id,type,butler_id,status,notes&order=created_at.desc`,
-    { headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` } }
-  )
-  const allTasks = await tasksRes.json()
-  const mine = Array.isArray(allTasks) ? allTasks.filter((t: any) =>
-    t.butler_id === butlerId ||
-    t.notes?.includes(`ButlerID: ${butlerId}`) ||
-    t.notes?.includes(`Butler: ${butlerName}`)
-  ) : []
+  // Attempt 3: body column instead of message
+  const r3 = await fetch(`${URL}/rest/v1/notifications`, { method: 'POST', headers: { ...h, 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ user_id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', title: 'Test', body: 'Test msg', type: 'info', read: false }) })
+  attempts.push({ attempt: 'body instead of message', status: r3.status, body: await r3.text() })
 
-  return NextResponse.json({
-    notificationInsert: { status: notifStatus, body: notifBody },
-    taskInsert: { status: taskStatus, body: taskBody },
-    butlerTasksFound: mine.length,
-    myTasks: mine.slice(0, 5),
-    note: notifStatus === 201 ? 'Notification FK is FIXED ✅' : 'Notification FK still BLOCKING ❌ — run SQL in Supabase dashboard',
-    taskNote: taskStatus === 201 ? 'Task insert works ✅' : 'Task insert FAILING ❌',
-    sqlToRun: 'ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_user_id_fkey; ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_butler_id_fkey; ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_type_check;'
-  })
+  // Attempt 4: content column
+  const r4 = await fetch(`${URL}/rest/v1/notifications`, { method: 'POST', headers: { ...h, 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ user_id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', title: 'Test', content: 'Test msg', is_read: false }) })
+  attempts.push({ attempt: 'content + is_read', status: r4.status, body: await r4.text() })
+
+  return NextResponse.json({ existingRows: notifRows.slice(0,2), columns: cols, attempts })
 }
