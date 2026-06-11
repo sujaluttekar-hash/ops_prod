@@ -375,7 +375,35 @@ export default function DelightPage() {
                             {allUploaded && <span className="badge badge-green">Complete</span>}
                           </div>
                         </td>
-                        <td><span className={getStatusBadge(e.status)}>{getStatusLabel(e.status)}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span className={getStatusBadge(e.status)}>{getStatusLabel(e.status)}</span>
+                            {photoCount > 0 && (
+                              <button className="sv-btn" style={{ fontSize: 10, padding: '3px 8px' }}
+                                onClick={ev => { ev.stopPropagation(); setReviewEntry(e); }}>
+                                🖼 View
+                              </button>
+                            )}
+                            {photoCount > 0 && (
+                              <button className="sv-btn" style={{ fontSize: 10, padding: '3px 8px' }}
+                                onClick={ev => {
+                                  ev.stopPropagation();
+                                  const photos = e.delight_photos ?? [];
+                                  photos.forEach((p, i) => {
+                                    if (p.public_url) {
+                                      const a = document.createElement('a');
+                                      a.href = p.public_url;
+                                      a.download = `${e.your_name}_${e.villa_name}_${p.pointer_key}.jpg`;
+                                      a.target = '_blank';
+                                      a.click();
+                                    }
+                                  });
+                                }}>
+                                ⬇ Photos
+                              </button>
+                            )}
+                          </div>
+                        </td>
                         {isAdminOrSupervisor && (
                           <td onClick={ev => { ev.stopPropagation(); setReviewEntry(e); }}>
                             <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }}>

@@ -349,12 +349,12 @@ export default function AllocationPage() {
       const { data: butlers } = await q;
       if (!butlers) { setAllocations([]); setLoading(false); return; }
 
-      const { data: tasks } = await getSupabase()
+      const { data: tasks } = await getServiceSupabase()
         .from('tasks').select('*')
         .gte('created_at', `${date}T00:00:00`)
         .lt('created_at', `${date}T23:59:59`);
 
-      const { data: delights } = await getSupabase()
+      const { data: delights } = await getServiceSupabase()
         .from('guest_delights').select('*')
         .eq('booking_date', date);
 
