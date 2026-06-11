@@ -210,7 +210,7 @@ export default function TasksPage() {
         setTimeout(load, 1000);
       }} />}
       <Topbar title={isSuper ? 'Utilisation tasks' : 'My tasks'} subtitle={isSuper ? 'Daily butler task tracking' : 'Tasks assigned to you'}
-        actions={<button className="sv-btn" style={{ fontSize: 12 }} onClick={load}>↻ Refresh</button>} />
+        actions={<button className="sv-btn" style={{ fontSize: 12 }} onClick={() => load()}>↻ Refresh</button>} />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
 
