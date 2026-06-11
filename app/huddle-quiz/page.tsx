@@ -1,10 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Topbar from '@/components/layout/Topbar';
 import { getSupabase } from '@/lib/supabase';
 
-export default function HuddleQuizPage() {
+function HuddleQuizContent() {
   const params = useSearchParams();
   const router = useRouter();
   const huddleId = params.get('huddle');
@@ -137,5 +137,13 @@ export default function HuddleQuizPage() {
         )}
       </div>
     </>
+  );
+}
+
+export default function HuddleQuizPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 24 }}>Loading…</div>}>
+      <HuddleQuizContent />
+    </Suspense>
   );
 }
