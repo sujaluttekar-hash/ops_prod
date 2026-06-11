@@ -34,11 +34,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser()
     const sb = getSupabase()
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event: any, session: any) => {
-      if (!session?.user?.id) { setUser(null); return }
+      if (!session?.user?.id) { setUser(null); setLoading(false); return }
       try {
         const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single()
         setUser((profile as Profile) || null)
       } catch { setUser(null) }
+      finally { setLoading(false) }
     })
     return () => { subscription?.unsubscribe(); clearTimeout(timeout) }
   }, [])
