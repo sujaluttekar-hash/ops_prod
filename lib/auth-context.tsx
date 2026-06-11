@@ -3,24 +3,12 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { getSupabase } from './supabase';
 
 export type Profile = {
-  id: string
-  name: string | null
-  email: string
-  role: 'super_admin' | 'ops_manager' | 'butler' | 'trainer'
-  squad: string | null
-  property_id: string | null
-  phone: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string | null
+  id: string; name: string | null; email: string;
+  role: 'super_admin' | 'ops_manager' | 'butler' | 'trainer';
+  squad: string | null; property_id: string | null; phone: string | null;
+  is_active: boolean; created_at: string; updated_at: string | null;
 }
-
-type AuthContextType = {
-  user: Profile | null
-  loading: boolean
-  signOut: () => Promise<void>
-}
-
+type AuthContextType = { user: Profile | null; loading: boolean; signOut: () => Promise<void> }
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -28,85 +16,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Hard timeout — if auth takes more than 4s, unblock the UI
-    const timeout = setTimeout(() => {
-      setLoading(false)
-    }, 4000)
-
+    const timeout = setTimeout(() => setLoading(false), 5000)
     const loadUser = async () => {
       try {
         const sb = getSupabase()
         const { data: { session } } = await sb.auth.getSession()
-
-        if (!session?.user?.id) {
-          setUser(null)
-          setLoading(false)
-          clearTimeout(timeout)
-          return
+        if (!session?.user?.id) { setUser(null); setLoading(false); clearTimeout(timeout); return }
+        const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single()
+        if (profile) { setUser(profile as Profile) }
+        else if (session.user.email) {
+          const { data: p2 } = await sb.from('profiles').select('*').eq('email', session.user.email).single()
+          setUser((p2 as Profile) || null)
         }
-
-        const { data: profile } = await sb
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-
-        if (profile) {
-          setUser(profile as Profile)
-        } else if (session.user.email) {
-          const { data: profileByEmail } = await sb
-            .from('profiles')
-            .select('*')
-            .eq('email', session.user.email)
-            .single()
-          setUser((profileByEmail as Profile) || null)
-        }
-      } catch (err) {
-        console.error('Auth load error:', err)
-        setUser(null)
-      } finally {
-        setLoading(false)
-        clearTimeout(timeout)
-      }
+      } catch { setUser(null) }
+      finally { setLoading(false); clearTimeout(timeout) }
     }
-
     loadUser()
-
     const sb = getSupabase()
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event: any, session: any) => {
-      if (!session?.user?.id) {
-        setUser(null)
-        return
-      }
+      if (!session?.user?.id) { setUser(null); return }
       try {
-        const { data: profile } = await sb
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+        const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single()
         setUser((profile as Profile) || null)
-      } catch {
-        setUser(null)
-      }
+      } catch { setUser(null) }
     })
-
-    return () => {
-      subscription?.unsubscribe()
-      clearTimeout(timeout)
-    }
+    return () => { subscription?.unsubscribe(); clearTimeout(timeout) }
   }, [])
 
-  const signOut = async () => {
-    const sb = getSupabase()
-    await sb.auth.signOut()
-    setUser(null)
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  const signOut = async () => { await getSupabase().auth.signOut(); setUser(null) }
+  return <AuthContext.Provider value={{ user, loading, signOut }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

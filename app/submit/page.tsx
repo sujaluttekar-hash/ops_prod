@@ -103,14 +103,7 @@ export default function SubmitPage() {
                 {/* Property */}
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Villa / Property *</div>
-                  {properties.length > 0 ? (
-                    <select className="sv-select" style={{ width: '100%' }} value={form.property} onChange={e => setForm(f => ({ ...f, property: e.target.value }))} required>
-                      <option value="">Select property</option>
-                      {properties.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                    </select>
-                  ) : (
-                    <input className="sv-input" style={{ width: '100%' }} placeholder="Type villa name" value={form.property} onChange={e => setForm(f => ({ ...f, property: e.target.value }))} required />
-                  )}
+                  <input className="sv-input" style={{ width: '100%' }} placeholder="Type villa / property name" value={form.property} onChange={e => setForm(f => ({ ...f, property: e.target.value }))} required />
                 </div>
 
                 {/* Notes */}

@@ -212,9 +212,18 @@ export default function TrainingPage() {
   const isSuper = user && isSupervisor(user.role as any);
 
   async function load() {
-    const [t, p] = await Promise.all([fetchTrainings(), fetchProfiles()]);
-    setTrainings(t);
-    setProfiles(p);
+    if (isSuper) {
+      const [t, p] = await Promise.all([fetchTrainings(), fetchProfiles()]);
+      setTrainings(t);
+      setProfiles(p);
+    } else if (user) {
+      const [t, att] = await Promise.all([
+        fetchTrainings(),
+        getSupabase().from('training_attendance').select('training_id').eq('butler_id', user.id).eq('attended', true),
+      ]);
+      const myIds = new Set((att.data || []).map((a: any) => a.training_id));
+      setTrainings(t.filter(tr => tr.status !== 'completed' || myIds.has(tr.id)));
+    }
     setLoading(false);
   }
 
@@ -352,8 +361,8 @@ export default function TrainingPage() {
           )}
         </div>
 
-        {/* Butler list — live from Supabase */}
-        <div className="sv-card">
+        {/* Butler roster — admin/supervisor only */}
+        {isSuper && <div className="sv-card">
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Butler roster</div>
           <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginBottom: 14 }}>All active butlers in the system</div>
           {loading ? (
@@ -373,7 +382,7 @@ export default function TrainingPage() {
               ))}
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </>
   );

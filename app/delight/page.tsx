@@ -245,7 +245,12 @@ export default function DelightPage() {
   async function load() {
     setLoading(true);
     const data = await fetchGuestDelights();
-    setEntries(data); setLoading(false);
+    if (user && user.role === 'butler') {
+      setEntries(data.filter(e => e.your_name === user.name));
+    } else {
+      setEntries(data);
+    }
+    setLoading(false);
   }
 
   useEffect(() => {

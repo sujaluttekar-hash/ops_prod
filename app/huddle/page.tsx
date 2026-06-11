@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { fetchHuddles, fetchProfiles, getSupabase, type Huddle, type Profile } from '@/lib/supabase';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
+import { isSupervisor } from '@/lib/auth';
 
 // ── Types ─────────────────────────────────────────────────────
 type QuizQuestion = { question: string; option_a: string; option_b: string; option_c: string; option_d: string; correct_option: string; };
@@ -397,6 +399,8 @@ function CalendarView({ huddles }: { huddles: HuddleWithStats[] }) {
 
 // ── Main page ─────────────────────────────────────────────────
 export default function HuddlePage() {
+  const { user } = useAuth();
+  const isSuper = user && isSupervisor(user.role as any);
   const [huddles, setHuddles] = useState<HuddleWithStats[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -446,7 +450,7 @@ export default function HuddlePage() {
                 </button>
               ))}
             </div>
-            <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowSchedule(true)}>+ Schedule huddle</button>
+            {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowSchedule(true)}>+ Schedule huddle</button>}
           </div>
         }
       />
@@ -484,7 +488,7 @@ export default function HuddlePage() {
                     <div style={{ textAlign: 'center', padding: '24px 0' }}>
                       <div style={{ fontSize: 32, marginBottom: 8 }}>◎</div>
                       <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginBottom: 12 }}>No upcoming huddles.</div>
-                      <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowSchedule(true)}>+ Schedule first huddle</button>
+                      {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowSchedule(true)}>+ Schedule first huddle</button>}
                     </div>
                   ) : upcoming.map(h => {
                     const d = new Date(h.huddle_date);
@@ -503,7 +507,7 @@ export default function HuddlePage() {
                           {h.notes && <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4, fontStyle: 'italic' }}>{h.notes}</div>}
                           <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <span className={getStatusBadge(h.status)}>{getStatusLabel(h.status)}</span>
-                            <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => setAttendanceHuddle(h)}>Mark attendance</button>
+                            {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => setAttendanceHuddle(h)}>Mark attendance</button>}
                           </div>
                         </div>
                       </div>
@@ -566,12 +570,12 @@ export default function HuddlePage() {
                             <td><span className={getStatusBadge(h.status)}>{getStatusLabel(h.status)}</span></td>
                             <td>
                               <div style={{ display: 'flex', gap: 6 }}>
-                                {h.status !== 'completed' && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setAttendanceHuddle(h)}>Attendance</button>}
+                                {isSuper && h.status !== 'completed' && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setAttendanceHuddle(h)}>Attendance</button>}
                                 {h.hasQuiz && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setScoresHuddle(h)}>Scores</button>}
-                                <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px', color: '#8B2020', borderColor: '#E9A0A7' }}
+                                {isSuper && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px', color: '#8B2020', borderColor: '#E9A0A7' }}
                                   onClick={async () => { if (confirm('Delete this huddle?')) { await getSupabase().from('huddles').delete().eq('id', h.id); load(); } }}>
                                   ✕
-                                </button>
+                                </button>}
                               </div>
                             </td>
                           </tr>
