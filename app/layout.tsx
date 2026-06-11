@@ -6,6 +6,11 @@ import AppShell from '@/components/layout/AppShell';
 export const metadata: Metadata = {
   title: 'Butler Operations',
   description: 'StayVista butler operations platform',
+  other: {
+    'cache-control': 'no-cache, no-store, must-revalidate',
+    'pragma': 'no-cache',
+    'expires': '0',
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
