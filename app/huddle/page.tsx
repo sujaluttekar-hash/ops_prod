@@ -63,15 +63,15 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
       // Send notifications to all butlers
       const { data: butlers } = await sb.from('profiles').select('id').eq('role', 'butler').eq('is_active', true);
       if (butlers && butlers.length > 0) {
-        await sb.from('notifications').insert(
+        sb.from('notifications').insert(
           butlers.map((b: any) => ({
             user_id: b.id,
             title: `Huddle scheduled: ${form.team}`,
-            body: `Scheduled for ${new Date(form.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${form.time ? ' at ' + form.time.slice(0,5) : ''}${addQuiz ? ' · Quiz included' : ''}`,
-            type: 'huddle',
+            message: `Scheduled for ${new Date(form.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${form.time ? ' at ' + form.time.slice(0,5) : ''}${addQuiz ? ' · Quiz included' : ''}`,
+            type: 'info',
             read: false,
           }))
-        );
+        ).then(() => {}).catch(() => {});
       }
 
       setSaved(true);

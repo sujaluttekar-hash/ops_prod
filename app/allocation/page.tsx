@@ -162,17 +162,13 @@ function ButlerDetailRow({ alloc, onAssign }: { alloc: ButlerAllocation; onAssig
     <tr>
       <td colSpan={8} style={{ background: 'rgba(0,0,0,0.018)', padding: 0 }}>
         <div style={{ padding: '16px 20px' }}>
-          {/* Always show two action buttons at top */}
+          {/* Booking type quick-assign + Assign task */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: alloc.tasks.length > 0 ? 14 : 0 }}>
-            <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={onAssign}>
-              + Assign task
-            </button>
-            <select className="sv-select" style={{ fontSize: 12, padding: '6px 10px' }}
+            <select className="sv-select" style={{ fontSize: 12, padding: '6px 12px', minWidth: 160 }}
               onChange={async e => {
                 const bt = e.target.value;
                 if (!bt) return;
                 e.target.value = '';
-                // Quick-assign booking type as a task
                 await getServiceSupabase().from('tasks').insert({
                   type: bt,
                   butler_id: alloc.id,
@@ -181,9 +177,12 @@ function ButlerDetailRow({ alloc, onAssign }: { alloc: ButlerAllocation; onAssig
                 });
                 onAssign();
               }}>
-              <option value="">Set booking type…</option>
+              <option value="">Booking type…</option>
               {BOOKING_TYPES.map(bt => <option key={bt} value={bt}>{bt}</option>)}
             </select>
+            <button className="sv-btn" style={{ fontSize: 12 }} onClick={onAssign}>
+              + Assign task
+            </button>
             {alloc.tasks.length === 0 && (
               <div style={{ fontSize: 13, color: 'var(--muted-fg)' }}>No tasks assigned yet.</div>
             )}
