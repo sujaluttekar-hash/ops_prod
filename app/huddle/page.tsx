@@ -13,7 +13,7 @@ type HuddleWithStats = Huddle & { attendanceCount?: number; hasQuiz?: boolean; q
 // ── Schedule Modal (admin/supervisor) ────────────────────────
 function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [step, setStep] = useState<'details' | 'quiz'>('details');
-  const [form, setForm] = useState({ team: '', huddle_date: '', time: '', participants_expected: '', notes: '', status: 'scheduled' });
+  const [form, setForm] = useState({ team: '', huddle_date: '', time: '', participants_expected: '', notes: '', meet_link: '', status: 'scheduled' });
   const [addQuiz, setAddQuiz] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestion[]>([{ question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'a' }]);
   const [saving, setSaving] = useState(false);
@@ -46,6 +46,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         time: form.time || null,
         participants_expected: parseInt(form.participants_expected) || 0,
         notes: form.notes || null,
+        meet_link: form.meet_link || null,
         status: form.status,
       }).select().single();
       if (hErr) throw new Error(hErr.message);
@@ -136,6 +137,10 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
                   <div>
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Notes / agenda</div>
                     <textarea className="sv-input" style={{ width: '100%', minHeight: 60, resize: 'vertical' }} placeholder="What will be covered?" value={form.notes} onChange={f('notes')} />
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Google Meet / Video link (optional)</div>
+                    <input className="sv-input" style={{ width: '100%' }} placeholder="https://meet.google.com/xxx-xxxx-xxx" value={form.meet_link} onChange={f('meet_link')} />
                   </div>
 
                   {/* Quiz toggle */}
@@ -344,45 +349,99 @@ function AttendanceModal({ huddle, profiles, onClose, onSaved }: { huddle: Huddl
 // ── Score Modal ───────────────────────────────────────────────
 function ScoresModal({ huddle, onClose }: { huddle: HuddleWithStats; onClose: () => void }) {
   const [scores, setScores] = useState<any[]>([]);
+  const [allButlers, setAllButlers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getServiceSupabase().from('huddle_quiz_attempts').select('*, profiles(name, squad)').eq('huddle_id', huddle.id).order('percentage', { ascending: false }).then((res: any) => { setScores(res.data ?? []); setLoading(false); });
+    const sb = getServiceSupabase();
+    Promise.all([
+      sb.from('huddle_quiz_attempts').select('*, profiles(name, squad)').eq('huddle_id', huddle.id).order('percentage', { ascending: false }),
+      sb.from('profiles').select('id, name, squad').eq('role', 'butler').eq('is_active', true),
+    ]).then(([attRes, butlerRes]: any) => {
+      setScores(attRes.data ?? []);
+      setAllButlers(butlerRes.data ?? []);
+      setLoading(false);
+    });
   }, [huddle.id]);
+
+  const attemptedIds = new Set(scores.map((s: any) => s.butler_id));
+  const notAttempted = allButlers.filter((b: any) => !attemptedIds.has(b.id));
+  const avgScore = scores.length > 0 ? Math.round(scores.reduce((a: number, s: any) => a + s.percentage, 0) / scores.length) : 0;
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 500, boxShadow: '0 24px 60px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 520, boxShadow: '0 24px 60px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Quiz scores</div>
-            <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>{huddle.team}</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Quiz results — {huddle.team}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>
+              {scores.length} attempted · {notAttempted.length} pending · avg score {avgScore}%
+            </div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
         </div>
-        <div className="sv-strip" style={{ marginBottom: 20 }} />
-        {loading ? <div style={{ textAlign: 'center', color: 'var(--muted-fg)', padding: 32 }}>Loading…</div> :
-          scores.length === 0 ? <div style={{ textAlign: 'center', color: 'var(--muted-fg)', padding: 32, fontSize: 13 }}>No quiz attempts yet.</div> : (
-            scores.map((s, i) => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '0.5px solid rgba(0,0,0,0.05)' }}>
-                <div style={{ fontSize: 18, width: 28, textAlign: 'center', flexShrink: 0 }}>
-                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted-fg)' }}>{i + 1}</span>}
-                </div>
-                <div className="sv-avatar">{(s.profiles?.name ?? '??').slice(0,2).toUpperCase()}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{s.profiles?.name ?? '—'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{s.profiles?.squad ?? '—'} · {s.score}/{s.total} correct</div>
-                  <div className="progress-track" style={{ marginTop: 6 }}>
-                    <div className={`progress-fill ${s.percentage >= 80 ? 'fill-green' : s.percentage >= 60 ? 'fill-blue' : 'fill-coral'}`} style={{ width: `${s.percentage}%` }} />
+        <div className="sv-strip" style={{ marginBottom: 16 }} />
+
+        {loading ? <div style={{ textAlign: 'center', color: 'var(--muted-fg)', padding: 32 }}>Loading…</div> : <>
+
+          {/* Summary stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
+            {[
+              { label: 'Attempted', value: scores.length, color: '#2D5A0E', bg: 'rgba(151,196,89,0.1)' },
+              { label: 'Pending', value: notAttempted.length, color: '#7A4A08', bg: 'rgba(254,213,169,0.2)' },
+              { label: 'Avg score', value: `${avgScore}%`, color: '#0C447C', bg: 'rgba(156,204,252,0.1)' },
+            ].map(s => (
+              <div key={s.label} style={{ background: s.bg, borderRadius: 10, padding: '12px 0', textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Scores */}
+          {scores.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--muted-fg)', padding: '16px 0', fontSize: 13 }}>No attempts yet.</div>
+          ) : (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Scores</div>
+              {scores.map((s: any, i: number) => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid rgba(0,0,0,0.05)' }}>
+                  <div style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>
+                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted-fg)' }}>{i+1}</span>}
+                  </div>
+                  <div className="sv-avatar">{(s.profiles?.name ?? '??').slice(0,2).toUpperCase()}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{s.profiles?.name ?? '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 1 }}>{s.profiles?.squad ?? '—'} · {s.score}/{s.total} correct</div>
+                    <div className="progress-track" style={{ marginTop: 5 }}>
+                      <div className={`progress-fill ${s.percentage >= 80 ? 'fill-green' : s.percentage >= 60 ? 'fill-blue' : 'fill-coral'}`} style={{ width: `${s.percentage}%` }} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: s.percentage >= 80 ? '#2D5A0E' : s.percentage >= 60 ? '#0C447C' : '#8B2020', flexShrink: 0 }}>
+                    {s.percentage}%
                   </div>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: s.percentage >= 80 ? '#2D5A0E' : s.percentage >= 60 ? '#0C447C' : '#8B2020', flexShrink: 0 }}>
-                  {s.percentage}%
+              ))}
+            </div>
+          )}
+
+          {/* Not attempted */}
+          {notAttempted.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Not attempted yet</div>
+              {notAttempted.map((b: any) => (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
+                  <div className="sv-avatar" style={{ opacity: 0.5 }}>{(b.name || '??').slice(0,2).toUpperCase()}</div>
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--muted-fg)' }}>{b.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted-fg)', opacity: 0.6 }}>{b.squad ?? '—'}</div>
+                  </div>
+                  <span className="badge badge-amber" style={{ marginLeft: 'auto' }}>Pending</span>
                 </div>
-              </div>
-            ))
-          )
-        }
+              ))}
+            </div>
+          )}
+        </>}
       </div>
     </div>
   );
@@ -545,6 +604,11 @@ export default function HuddlePage() {
                           </div>
                           {h.hasQuiz && <div style={{ fontSize: 11, marginTop: 3 }}><span className="badge badge-blue">Quiz: {h.questionCount}q</span></div>}
                           {h.notes && <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4, fontStyle: 'italic' }}>{h.notes}</div>}
+                          {(h as any).meet_link && (
+                            <a href={(h as any).meet_link} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#1a73e8', fontWeight: 600, marginTop: 6, background: 'rgba(26,115,232,0.08)', padding: '4px 10px', borderRadius: 6 }}>
+                              📹 Join Google Meet
+                            </a>
+                          )}
                           <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <span className={getStatusBadge(h.status)}>{getStatusLabel(h.status)}</span>
                             {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => setAttendanceHuddle(h)}>Mark attendance</button>}
