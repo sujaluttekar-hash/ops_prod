@@ -1,7 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchTasks, getServiceSupabase, type Task } from '@/lib/supabase';
+import { fetchTasks, getServiceSupabase, uploadTaskPhoto, type Task } from '@/lib/supabase';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
@@ -9,38 +9,135 @@ import { isSupervisor } from '@/lib/auth';
 const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie'];
 const taskEmoji: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋' };
 
+// ── Complete Task Modal ────────────────────────────────────────
+function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () => void; onDone: () => void }) {
+  const [notes, setNotes] = useState('');
+  const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setPhoto({ file, preview: ev.target?.result as string });
+    reader.readAsDataURL(file);
+  }
+
+  async function handleSubmit() {
+    setSaving(true);
+    try {
+      let photo_url: string | null = null;
+      if (photo) {
+        photo_url = await uploadTaskPhoto(photo.file, task.id);
+      }
+      await getServiceSupabase().from('tasks').update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        notes: notes || task.notes || null,
+        photo_path: photo_url || task.photo_path || null,
+      }).eq('id', task.id);
+      setDone(true);
+      setTimeout(() => { onDone(); onClose(); }, 900);
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+      setSaving(false);
+    }
+  }
+
+  const villaName = task.notes?.replace('Villa: ', '').split(' · ')[0] || task.property_id || '—';
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 440, boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+        {done ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ fontSize: 52, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>Task completed!</div>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>Complete task</div>
+                <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>
+                  {taskEmoji[task.type] || '✓'} {task.type} · {villaName}
+                </div>
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
+            </div>
+            <div className="sv-strip" style={{ marginBottom: 18 }} />
+
+            {/* Photo upload */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Photo proof (optional)</div>
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
+              <input ref={galleryRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+              {photo ? (
+                <div style={{ position: 'relative' }}>
+                  <img src={photo.preview} alt="" style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 10 }} />
+                  <button onClick={() => setPhoto(null)} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 24, height: 24, fontSize: 12, cursor: 'pointer' }}>✕</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={() => cameraRef.current?.click()}
+                    style={{ flex: 1, padding: '12px 0', background: '#1B1D1F', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+                    📷 Take photo
+                  </button>
+                  <button type="button" onClick={() => galleryRef.current?.click()}
+                    style={{ flex: 1, padding: '12px 0', background: 'var(--muted)', color: 'var(--sv-dark)', border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+                    🖼 Gallery
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Notes (optional)</div>
+              <textarea
+                value={notes} onChange={e => setNotes(e.target.value)}
+                placeholder="Any notes about this task..."
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, fontSize: 14, resize: 'vertical', minHeight: 72, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="sv-btn" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+              <button type="button" className="sv-btn sv-btn-primary" onClick={handleSubmit} disabled={saving} style={{ flex: 2 }}>
+                {saving ? 'Submitting…' : '✓ Submit & complete'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function TasksPage() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
-  const [completing, setCompleting] = useState<string | null>(null);
+  const [completeTask, setCompleteTask] = useState<any | null>(null);
 
   const isSuper = user && isSupervisor(user.role as any);
 
   async function load() {
     const sb = getServiceSupabase();
-    let q = sb.from('tasks').select('*, profiles(name), properties(name)').order('created_at', { ascending: false });
-    // Butlers only see their own tasks
-    if (user && !isSuper) {
-      q = q.eq('butler_id', user.id);
-    }
+    let q = sb.from('tasks').select('*, profiles(name)').order('created_at', { ascending: false });
+    if (user && !isSuper) q = q.eq('butler_id', user.id);
     const { data } = await q;
     setTasks((data || []) as any);
     setLoading(false);
   }
 
   useEffect(() => { if (user) load(); }, [user]);
-
-  async function markComplete(taskId: string) {
-    setCompleting(taskId);
-    await getServiceSupabase()
-      .from('tasks')
-      .update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', taskId);
-    await load();
-    setCompleting(null);
-  }
 
   const filtered = tasks.filter(t => filter === 'All' || t.status === filter);
   const done = tasks.filter(t => t.status === 'completed').length;
@@ -49,10 +146,8 @@ export default function TasksPage() {
 
   return (
     <>
-      <Topbar
-        title={isSuper ? 'Utilisation tasks' : 'My tasks'}
-        subtitle={isSuper ? 'Daily butler task tracking' : 'Tasks assigned to you'}
-      />
+      {completeTask && <CompleteTaskModal task={completeTask} onClose={() => setCompleteTask(null)} onDone={load} />}
+      <Topbar title={isSuper ? 'Utilisation tasks' : 'My tasks'} subtitle={isSuper ? 'Daily butler task tracking' : 'Tasks assigned to you'} />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
 
@@ -71,7 +166,7 @@ export default function TasksPage() {
           ))}
         </div>
 
-        {/* Task type breakdown */}
+        {/* Type breakdown */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, marginBottom: 16 }}>
           {TASK_TYPES.map(type => {
             const count = tasks.filter(t => t.type === type).length;
@@ -93,7 +188,7 @@ export default function TasksPage() {
               {isSuper ? 'All tasks' : 'My tasks'}
               <span className="badge badge-green" style={{ marginLeft: 6 }}>Live</span>
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {['All','pending','completed','delayed'].map(f => (
                 <button key={f} onClick={() => setFilter(f)} className="sv-btn"
                   style={{ fontSize: 11, padding: '5px 10px', background: filter === f ? '#1B1D1F' : undefined, color: filter === f ? '#fff' : undefined }}>
@@ -116,7 +211,7 @@ export default function TasksPage() {
                   <tr>
                     <th>Task</th>
                     {isSuper && <th>Butler</th>}
-                    <th>Property</th>
+                    <th>Villa</th>
                     <th>Due</th>
                     <th>Status</th>
                     <th>Action</th>
@@ -126,11 +221,12 @@ export default function TasksPage() {
                   {filtered.map(t => {
                     const tAny = t as any;
                     const isPending = t.status === 'pending';
+                    const villaName = t.notes?.replace('Villa: ', '').split(' · ')[0] || '—';
                     return (
                       <tr key={t.id}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <span style={{ fontSize: 18 }}>{taskEmoji[t.type] || '✓'}</span>
+                            <span style={{ fontSize: 16 }}>{taskEmoji[t.type] || '✓'}</span>
                             <span style={{ fontWeight: 500 }}>{t.type}</span>
                           </div>
                         </td>
@@ -144,9 +240,7 @@ export default function TasksPage() {
                             </div>
                           </td>
                         )}
-                        <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>
-                          {t.notes ? t.notes.split(' · ')[0].replace('Villa: ', '') : '—'}
-                        </td>
+                        <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{villaName}</td>
                         <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{t.due_time ?? '—'}</td>
                         <td><span className={getStatusBadge(t.status)}>{getStatusLabel(t.status)}</span></td>
                         <td>
@@ -154,10 +248,8 @@ export default function TasksPage() {
                             <button
                               className="sv-btn sv-btn-primary"
                               style={{ fontSize: 11, padding: '5px 12px' }}
-                              disabled={completing === t.id}
-                              onClick={() => markComplete(t.id)}
-                            >
-                              {completing === t.id ? 'Saving…' : '✓ Mark done'}
+                              onClick={() => setCompleteTask(t)}>
+                              Complete task
                             </button>
                           ) : t.status === 'completed' ? (
                             <span style={{ fontSize: 12, color: '#2D5A0E', fontWeight: 600 }}>✅ Done</span>

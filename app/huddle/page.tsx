@@ -634,24 +634,48 @@ export default function HuddlePage() {
                   })}
               </div>
 
-              {/* Butler attendance summary */}
+              {/* Attendance summary — admin sees all butlers, butler sees only own */}
               <div className="sv-card">
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Overall butler attendance</div>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>
+                  {isSuper ? 'Overall butler attendance' : 'My huddle attendance'}
+                </div>
                 {loading ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>Loading…</div> :
-                  butlers.length === 0 ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>No butlers yet.</div> :
-                  butlers.map(p => {
-                    const totalCompleted = completed.length;
-                    return (
-                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
-                        <div className="sv-avatar">{(p.name || "??").slice(0,2).toUpperCase()}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 1 }}>{p.squad ?? '—'}</div>
-                        </div>
-                        {totalCompleted > 0 && <span className="badge badge-blue">{totalCompleted} huddle{totalCompleted !== 1 ? 's' : ''}</span>}
-                      </div>
-                    );
-                  })}
+                  isSuper ? (
+                    // Admin/supervisor: show all butlers
+                    butlers.length === 0
+                      ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>No butlers yet.</div>
+                      : butlers.map(p => {
+                          const totalCompleted = completed.length;
+                          return (
+                            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
+                              <div className="sv-avatar">{(p.name || '??').slice(0,2).toUpperCase()}</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
+                                <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 1 }}>{p.squad ?? '—'}</div>
+                              </div>
+                              {totalCompleted > 0 && <span className="badge badge-blue">{totalCompleted} huddle{totalCompleted !== 1 ? 's' : ''}</span>}
+                            </div>
+                          );
+                        })
+                  ) : (
+                    // Butler: show only their own upcoming huddles and attendance
+                    upcoming.length === 0
+                      ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>No upcoming huddles scheduled.</div>
+                      : upcoming.map(h => (
+                          <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
+                            <div style={{ fontSize: 22 }}>💬</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>{h.team}</div>
+                              <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 1 }}>
+                                {new Date(h.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                {h.time ? ' · ' + h.time.slice(0,5) : ''}
+                              </div>
+                            </div>
+                            {user && <ButlerAttendButton huddleId={h.id} butlerId={user.id} />}
+                          </div>
+                        ))
+                  )
+                }
               </div>
             </div>
 
