@@ -139,6 +139,12 @@ export default function TasksPage() {
 
   useEffect(() => { if (user) load(); }, [user]);
 
+  // Poll every 15s so admin sees butler completions in near real-time
+  useEffect(() => {
+    const t = setInterval(() => { if (user) load(); }, 15000);
+    return () => clearInterval(t);
+  }, [user]);
+
   const filtered = tasks.filter(t => filter === 'All' || t.status === filter);
   const done = tasks.filter(t => t.status === 'completed').length;
   const delayed = tasks.filter(t => t.status === 'delayed').length;
@@ -147,7 +153,8 @@ export default function TasksPage() {
   return (
     <>
       {completeTask && <CompleteTaskModal task={completeTask} onClose={() => setCompleteTask(null)} onDone={load} />}
-      <Topbar title={isSuper ? 'Utilisation tasks' : 'My tasks'} subtitle={isSuper ? 'Daily butler task tracking' : 'Tasks assigned to you'} />
+      <Topbar title={isSuper ? 'Utilisation tasks' : 'My tasks'} subtitle={isSuper ? 'Daily butler task tracking' : 'Tasks assigned to you'}
+        actions={<button className="sv-btn" style={{ fontSize: 12 }} onClick={load}>↻ Refresh</button>} />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
 
