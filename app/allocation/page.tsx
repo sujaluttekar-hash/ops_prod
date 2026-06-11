@@ -81,13 +81,16 @@ function AssignTaskModal({
       if (err) throw new Error(err.message);
 
       // Send notification to the butler
-      getServiceSupabase().from('notifications').insert({
-        user_id: butler.id,
-        title: 'New task assigned',
-        message: `You have been assigned: ${form.task_type || form.booking_type}${form.property_id ? ' at ' + form.property_id : ''}${form.due_time ? ' · Due ' + form.due_time : ''}${form.notes ? ' · ' + form.notes : ''}`,
-        type: 'info',
-        read: false,
-      }).then(() => {}).catch(() => {});
+      try {
+        const notifRes = await getServiceSupabase().from('notifications').insert({
+          user_id: butler.id,
+          title: 'New task assigned',
+          message: `You have been assigned: ${form.task_type || form.booking_type}${form.property_id ? ' at ' + form.property_id : ''}${form.due_time ? ' · Due ' + form.due_time : ''}`,
+          type: 'info',
+          read: false,
+        });
+        if (notifRes.error) console.warn('Notification insert failed:', notifRes.error.message, notifRes.error.code);
+      } catch (e: any) { console.warn('Notification error:', e.message); }
 
       setSaved(true);
       setTimeout(() => { onSaved(); onClose(); }, 800);
@@ -191,13 +194,16 @@ function ButlerDetailRow({ alloc, onAssign }: { alloc: ButlerAllocation; onAssig
                   created_at: new Date().toISOString(),
                 });
                 // Notify butler
-                getServiceSupabase().from('notifications').insert({
-                  user_id: alloc.id,
-                  title: 'New task assigned',
-                  message: `You have been assigned: ${bt}`,
-                  type: 'info',
-                  read: false,
-                }).then(() => {}).catch(() => {});
+                try {
+                  const nr = await getServiceSupabase().from('notifications').insert({
+                    user_id: alloc.id,
+                    title: 'New task assigned',
+                    message: `You have been assigned: ${bt}`,
+                    type: 'info',
+                    read: false,
+                  });
+                  if (nr.error) console.warn('Notification failed:', nr.error.message, nr.error.code);
+                } catch (e: any) { console.warn('Notification error:', e.message); }
                 onAssign();
               }}>
               <option value="">Booking type…</option>
