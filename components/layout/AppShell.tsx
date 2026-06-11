@@ -1,6 +1,7 @@
 'use client';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase';
 
@@ -64,24 +65,36 @@ const navByRole: Record<string, { overview: NavItem[]; operations: NavItem[]; le
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading } = useAuth();
 
   const isLoginPage = pathname === '/login';
+
+  // Redirect to login if not authenticated (after loading completes)
+  useEffect(() => {
+    if (!loading && !user && !isLoginPage) {
+      router.replace('/login');
+    }
+  }, [loading, user, isLoginPage, router]);
 
   if (isLoginPage) {
     return <>{children}</>;
   }
 
+  // Show loading spinner while auth resolves
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f1117', color: '#fff' }}>
-        Loading...
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f1117', color: '#fff', flexDirection: 'column', gap: 12 }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid rgba(156,204,252,0.3)', borderTop: '2px solid #9CCCFC', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Loading...</div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
+  // Not logged in — show nothing while redirect happens
   if (!user) {
-    return <>{children}</>;
+    return null;
   }
 
   const nav = navByRole[user.role] || navByRole.butler;
@@ -174,20 +187,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Footer */}
         <div style={{ position: 'absolute', bottom: 0, width: '100%', padding: '16px 12px', borderTop: '0.5px solid rgba(255,255,255,0.1)', background: '#0d1117' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #9CCCFC, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #9CCCFC, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
               {user.name?.[0]?.toUpperCase() || 'U'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
               <div style={{ fontSize: 10, color: '#8b949e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user.role === 'super_admin' ? 'Super Admin' : user.role === 'ops_manager' ? 'Supervisor' : 'Butler'}
+                {user.role === 'super_admin' ? 'Super Admin' : user.role === 'ops_manager' ? 'Supervisor' : user.role === 'trainer' ? 'Trainer' : 'Butler'}
               </div>
             </div>
           </div>
           <button
             onClick={async () => {
-              const { useAuth: getAuth } = await import('@/lib/auth-context');
-              // This is handled by AuthContext now
+              await getSupabase().auth.signOut();
               window.location.href = '/login';
             }}
             style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: 6, color: '#c9d1d9', fontSize: 12, cursor: 'pointer' }}>
