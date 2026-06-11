@@ -38,7 +38,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault(); setSaving(true); setError('');
     try {
-      const sb = getSupabase();
+      const sb = getServiceSupabase();
       // Insert huddle
       const { data: huddle, error: hErr } = await sb.from('huddles').insert({
         team: form.team,
@@ -237,7 +237,7 @@ function AttendanceModal({ huddle, profiles, onClose, onSaved }: { huddle: Huddl
 
   async function handleSave() {
     setSaving(true);
-    const sb = getSupabase();
+    const sb = getServiceSupabase();
     const butlers = profiles.filter(p => p.role === 'butler');
     for (const p of butlers) {
       await sb.from('huddle_attendance').upsert({ huddle_id: huddle.id, butler_id: p.id, attended: attended.has(p.id) }, { onConflict: 'huddle_id,butler_id' });
@@ -410,7 +410,7 @@ export default function HuddlePage() {
   const [view, setView] = useState<'list' | 'calendar'>('list');
 
   async function load() {
-    const sb = getSupabase();
+    const sb = getServiceSupabase();
     const [h, p, att, qs] = await Promise.all([
       fetchHuddles(),
       fetchProfiles(),

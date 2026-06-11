@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Topbar from '@/components/layout/Topbar';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, getServiceSupabase } from '@/lib/supabase';
 
 function HuddleQuizContent() {
   const params = useSearchParams();
@@ -20,7 +20,7 @@ function HuddleQuizContent() {
   useEffect(() => {
     if (!huddleId) return;
     async function load() {
-      const sb = getSupabase();
+      const sb = getServiceSupabase();
       const { data: { session } } = await sb.auth.getSession();
       const userId = session?.user?.id;
 
@@ -38,7 +38,7 @@ function HuddleQuizContent() {
   }, [huddleId]);
 
   async function handleSubmit() {
-    const sb = getSupabase();
+    const sb = getServiceSupabase();
     const { data: { session } } = await sb.auth.getSession();
     if (!session?.user) return;
 

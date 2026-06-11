@@ -134,7 +134,7 @@ function AttendanceModal({ training, profiles, onClose, onSaved }: { training: T
 
   async function handleSave() {
     setSaving(true);
-    const sb = getSupabase();
+    const sb = getServiceSupabase();
     for (const p of butlers) {
       await sb.from('training_attendance').upsert(
         { training_id: training.id, butler_id: p.id, attended: attended.has(p.id) },

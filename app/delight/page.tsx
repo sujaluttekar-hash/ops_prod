@@ -141,7 +141,7 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
 // ── Photo review modal (admin/supervisor) ────────────────────
 function PhotoReviewModal({ entry, onClose, onApprove }: { entry: GuestDelight; onClose: () => void; onApprove: () => void }) {
   const photos = entry.delight_photos ?? [];
-  const sb = getSupabase();
+  const sb = getServiceSupabase();
 
   async function handleApprove() {
     await sb.from('guest_delights').update({ status: 'completed' }).eq('id', entry.id);
