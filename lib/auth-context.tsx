@@ -16,68 +16,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  async function fetchProfile(userId: string, email: string): Promise<Profile | null> {
+  useEffect(() => {
+    async function init() {
+      // 1. Try local session first (works even when Supabase is unreachable)
+      try {
+        const local = localStorage.getItem('sv_local_session')
+        if (local) {
+          const profile = JSON.parse(local) as Profile
+          setUser(profile)
+          setLoading(false)
+          // Also try to get real Supabase session in background
+          trySupabase(profile)
+          return
+        }
+      } catch {}
+
+      // 2. Try Supabase session with timeout
+      await trySupabaseOnly()
+    }
+
+    async function trySupabase(localProfile: Profile) {
+      try {
+        const sb = getSupabase()
+        const { data: { session } } = await Promise.race([
+          sb.auth.getSession(),
+          new Promise<any>((_, r) => setTimeout(() => r(new Error('timeout')), 4000))
+        ]) as any
+        if (session?.user?.id) {
+          const { data } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+          if (data) {
+            setUser(data as Profile)
+            localStorage.setItem('sv_local_session', JSON.stringify(data))
+          }
+        }
+      } catch {}
+    }
+
+    async function trySupabaseOnly() {
+      try {
+        const sb = getSupabase()
+        const result = await Promise.race([
+          sb.auth.getSession(),
+          new Promise<any>((_, r) => setTimeout(() => r(new Error('timeout')), 4000))
+        ]) as any
+
+        if (result?.data?.session?.user?.id) {
+          const { data } = await sb.from('profiles').select('*')
+            .eq('id', result.data.session.user.id).maybeSingle()
+          if (data) {
+            setUser(data as Profile)
+            localStorage.setItem('sv_local_session', JSON.stringify(data))
+          }
+        }
+      } catch {}
+      setLoading(false)
+    }
+
+    init()
+
+    // Listen for real Supabase auth changes
     try {
       const sb = getSupabase()
-      // Try by ID first
-      const { data, error } = await sb
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
-
-      if (data) return data as Profile
-
-      // Fallback: try by email
-      const { data: byEmail } = await sb
-        .from('profiles')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle()
-
-      return (byEmail as Profile) || null
-    } catch {
-      return null
-    }
-  }
-
-  useEffect(() => {
-    const sb = getSupabase()
-
-    // Get initial session — set loading false immediately after session check
-    sb.auth.getSession().then(async ({ data: { session } }: any) => {
-      if (!session?.user) {
-        setUser(null)
+      const { data: { subscription } } = sb.auth.onAuthStateChange(async (event: any, session: any) => {
+        if (!session?.user) {
+          localStorage.removeItem('sv_local_session')
+          setUser(null)
+          setLoading(false)
+          return
+        }
+        try {
+          const { data } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+          if (data) {
+            setUser(data as Profile)
+            localStorage.setItem('sv_local_session', JSON.stringify(data))
+          }
+        } catch {}
         setLoading(false)
-        return
-      }
-      // Unblock UI immediately with session data, fetch profile in background
-      setLoading(false)
-      const profile = await fetchProfile(session.user.id, session.user.email ?? '')
-      if (profile) setUser(profile)
-    }).catch(() => {
-      setLoading(false)
-    })
-
-    // Listen for sign-in / sign-out events
-    const { data: { subscription } } = sb.auth.onAuthStateChange(async (event: any, session: any) => {
-      if (!session?.user) {
-        setUser(null)
-        setLoading(false)
-        return
-      }
-      setLoading(false)
-      const profile = await fetchProfile(session.user.id, session.user.email ?? '')
-      if (profile) setUser(profile)
-    })
-
-    return () => subscription?.unsubscribe()
+      })
+      return () => subscription?.unsubscribe()
+    } catch {}
   }, [])
 
   const signOut = async () => {
-    await getSupabase().auth.signOut()
+    localStorage.removeItem('sv_local_session')
+    try { await getSupabase().auth.signOut() } catch {}
     setUser(null)
     setLoading(false)
+    window.location.replace('/login')
   }
 
   return (
