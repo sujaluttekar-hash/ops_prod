@@ -18,6 +18,7 @@ const navByRole: Record<string, NavSection> = {
       { label: 'Roster', href: '/roster', icon: '👥' },
       { label: 'Huddles', href: '/huddle', icon: '💬' },
       { label: 'Butler calendar', href: '/butler-calendar', icon: '🗓' },
+      { label: 'Property map', href: '/map', icon: '🗺' },
     ],
     learning: [
       { label: 'Training', href: '/training', icon: '📚' },
@@ -38,6 +39,7 @@ const navByRole: Record<string, NavSection> = {
       { label: 'Roster', href: '/roster', icon: '👥' },
       { label: 'Huddles', href: '/huddle', icon: '💬' },
       { label: 'Butler calendar', href: '/butler-calendar', icon: '🗓' },
+      { label: 'Property map', href: '/map', icon: '🗺' },
     ],
     learning: [
       { label: 'Training', href: '/training', icon: '📚' },
@@ -53,6 +55,7 @@ const navByRole: Record<string, NavSection> = {
       { label: 'My tasks', href: '/tasks', icon: '📋' },
       { label: 'My roster', href: '/roster', icon: '👤' },
       { label: 'My calendar', href: '/butler-calendar', icon: '🗓' },
+      { label: 'Property map', href: '/map', icon: '🗺' },
     ],
     learning: [
       { label: 'My trainings', href: '/training', icon: '📚' },
