@@ -2,9 +2,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { PROPERTIES } from '@/lib/properties-data';
+import { getServiceSupabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type Property = { id: string; name: string; squad: string; address: string; lat: number; lng: number; kms: number; };
+type TaskPin = { id: string; type: string; status: string; butler: string; villa: string; due_time: string | null; lat: number; lng: number; };
 
 const SQUAD_COLORS = {
   Lonavala: '#9CCCFC',
@@ -26,6 +28,42 @@ export default function MapPage() {
   const [search, setSearch] = useState('');
   const [mapLoaded, setMapLoaded] = useState(false);
   const [listView, setListView] = useState(false);
+  const [showTasks, setShowTasks] = useState(true);
+  const [taskPins, setTaskPins] = useState<TaskPin[]>([]);
+  const taskMarkersRef = useRef<any[]>([]);
+
+  // Load active tasks and match to property coordinates
+  useEffect(() => {
+    getServiceSupabase()
+      .from('tasks')
+      .select('id, type, status, notes, due_time, profiles(name)')
+      .in('status', ['pending', 'completed'])
+      .order('created_at', { ascending: false })
+      .limit(200)
+      .then(({ data }: any) => {
+        if (!data) return;
+        const pins: TaskPin[] = [];
+        data.forEach((t: any) => {
+          // Extract villa name from notes
+          const villaMatch = t.notes?.match(/Villa: ([^·]+)/);
+          const villaName = villaMatch ? villaMatch[1].trim() : null;
+          if (!villaName) return;
+          const prop = PROPERTIES.find(p => p.name.toLowerCase() === villaName.toLowerCase() || p.name.toLowerCase().includes(villaName.toLowerCase()));
+          if (!prop) return;
+          pins.push({
+            id: t.id,
+            type: t.type,
+            status: t.status,
+            butler: t.profiles?.name || 'Butler',
+            villa: villaName,
+            due_time: t.due_time,
+            lat: prop.lat,
+            lng: prop.lng,
+          });
+        });
+        setTaskPins(pins);
+      });
+  }, []);
 
   const filtered = PROPERTIES.filter(p => {
     const matchSquad = squadFilter === 'All' || p.squad === squadFilter;
@@ -99,6 +137,38 @@ export default function MapPage() {
     });
   }, [filtered, mapLoaded]);
 
+  // Render task pins as activity markers
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+    const L = (window as any).L;
+    const map = mapInstanceRef.current;
+    taskMarkersRef.current.forEach(m => map.removeLayer(m));
+    taskMarkersRef.current = [];
+    if (!showTasks) return;
+    taskPins.forEach(t => {
+      const isPending = t.status === 'pending';
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="
+          width:22px;height:22px;border-radius:4px;
+          background:${isPending ? '#FED5A9' : '#97C459'};
+          border:2px solid ${isPending ? '#7A4A08' : '#2D5A0E'};
+          box-shadow:0 2px 6px rgba(0,0,0,0.25);
+          display:flex;align-items:center;justify-content:center;
+          font-size:11px;cursor:pointer;
+        ">${isPending ? '⏳' : '✅'}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+      const m = L.marker([t.lat, t.lng], { icon, zIndexOffset: 500 })
+        .addTo(map)
+        .bindTooltip(`<b>${t.type}</b><br>👤 ${t.butler}<br>🏡 ${t.villa}${t.due_time ? '<br>⏰ ' + t.due_time : ''}<br><span style="color:${isPending ? '#7A4A08' : '#2D5A0E'}">${isPending ? 'Pending' : 'Completed'}</span>`, {
+          direction: 'top', offset: [0, -10], className: 'sv-map-tooltip',
+        });
+      taskMarkersRef.current.push(m);
+    });
+  }, [taskPins, showTasks, mapLoaded]);
+
   function flyTo(p: Property) {
     setSelected(p);
     if (mapInstanceRef.current) {
@@ -131,9 +201,12 @@ export default function MapPage() {
 
       <Topbar
         title="Property Map"
-        subtitle={`${filtered.length} of ${PROPERTIES.length} properties`}
+        subtitle={`${filtered.length} of ${PROPERTIES.length} villas · ${taskPins.filter(t => t.status === 'pending').length} active tasks`}
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
+            <button className="sv-btn" style={{ fontSize: 11, padding: '5px 10px', background: showTasks ? '#FED5A9' : undefined, color: showTasks ? '#7A4A08' : undefined, borderColor: showTasks ? '#7A4A08' : undefined }} onClick={() => setShowTasks(v => !v)}>
+              {showTasks ? '⏳ Tasks on' : '⏳ Tasks off'}
+            </button>
             <button className="sv-btn" style={{ fontSize: 11, padding: '5px 10px', background: listView ? '#1B1D1F' : undefined, color: listView ? '#fff' : undefined }} onClick={() => setListView(v => !v)}>
               {listView ? '🗺 Map' : '☰ List'}
             </button>
@@ -202,6 +275,22 @@ export default function MapPage() {
                   Loading map…
                 </div>
               )}
+
+              {/* Map legend */}
+              <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'rgba(255,255,255,0.95)', borderRadius: 10, padding: '10px 12px', boxShadow: '0 2px 12px rgba(0,0,0,0.12)', fontSize: 11 }}>
+                <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted-fg)' }}>Legend</div>
+                {[
+                  { dot: '#9CCCFC', label: 'Lonavala villa' },
+                  { dot: '#97C459', label: 'Karjat villa' },
+                  { dot: '#FED5A9', label: 'Pending task', square: true },
+                  { dot: '#97C459', label: 'Completed task', square: true },
+                ].map(l => (
+                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <div style={{ width: l.square ? 10 : 8, height: l.square ? 10 : 8, borderRadius: l.square ? 2 : '50%', background: l.dot, flexShrink: 0, border: '1.5px solid rgba(0,0,0,0.15)' }} />
+                    <span style={{ color: '#444' }}>{l.label}</span>
+                  </div>
+                ))}
+              </div>
 
               {/* Selected property panel */}
               {selected && (

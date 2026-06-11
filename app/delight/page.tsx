@@ -1,4 +1,5 @@
 'use client';
+import { PROPERTIES } from '@/lib/properties-data';
 import { useState, useRef, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { fetchGuestDelights, insertGuestDelight, uploadDelightPhoto, getSupabase, getServiceSupabase, BUCKETS, type GuestDelight } from '@/lib/supabase';
@@ -123,7 +124,7 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
             {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
             <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>Booking details</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-              {([['your_name','Your name *','text','e.g. Ravi Kumar',true],['squad','Your squad *','text','e.g. Lonavala',true],['booking_date','Booking date *','date','',true],['booking_id','Booking ID','text','BK-2026-04821',false],['villa_name','Villa name *','text','Type villa name',true]] as any[]).map(([key,label,type,ph,req]) => (
+              {([['your_name','Your name *','text','e.g. Ravi Kumar',true],['squad','Your squad *','text','e.g. Lonavala',true],['booking_date','Booking date *','date','',true],['booking_id','Booking ID','text','BK-2026-04821',false]] as any[]).map(([key,label,type,ph,req]) => (
                 <div key={key}>
                   <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>{label}</div>
                   <input className="sv-input" style={{ width: '100%' }} type={type} placeholder={ph} value={(form as any)[key]} onChange={f(key)} required={req} />
@@ -131,6 +132,11 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
               ))}
               <div>
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking type *</div>
+                {/* Villa search dropdown */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 5 }}>Villa name *</label>
+                  <DelightVillaSearch value={form.villa_name} onChange={v => setForm(f => ({ ...f, villa_name: v }))} squad={form.squad} />
+                </div>
                 <select className="sv-select" style={{ width: '100%' }} value={form.booking_type} onChange={f('booking_type')} required>
                   <option value="">Select type</option>
                   {BOOKING_TYPES.map(t => <option key={t}>{t}</option>)}
@@ -250,6 +256,37 @@ function PhotoReviewModal({ entry, onClose, onApprove }: { entry: GuestDelight; 
 }
 
 // ── Main page ────────────────────────────────────────────────
+
+// ── Villa Search for Delight ─────────────────────────────────
+function DelightVillaSearch({ value, onChange, squad }: { value: string; onChange: (v: string) => void; squad: string }) {
+  const [query, setQuery] = useState(value);
+  const [open, setOpen] = useState(false);
+  const results = query.length > 0
+    ? PROPERTIES.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, 10)
+    : PROPERTIES.filter(p => !squad || p.squad === squad).slice(0, 10);
+  return (
+    <div style={{ position: 'relative' }}>
+      <input className="sv-input" style={{ width: '100%' }} placeholder="Search villa name…" value={query}
+        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 180)} />
+      {open && results.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, boxShadow: '0 8px 20px rgba(0,0,0,0.12)', maxHeight: 180, overflowY: 'auto', marginTop: 2 }}>
+          {results.map(p => (
+            <div key={p.id} onMouseDown={() => { setQuery(p.name); onChange(p.name); setOpen(false); }}
+              style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '0.5px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.squad === 'Lonavala' ? '#9CCCFC' : '#97C459', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--muted-fg)' }}>{p.squad} · {p.kms} km</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DelightPage() {
   const [entries, setEntries] = useState<GuestDelight[]>([]);
   const [loading, setLoading] = useState(true);

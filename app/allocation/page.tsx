@@ -1,4 +1,5 @@
 'use client';
+import { PROPERTIES } from '@/lib/properties-data';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { getSupabase, getServiceSupabase } from '@/lib/supabase';
@@ -34,6 +35,46 @@ const BOOKING_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
   'Check-In':    { bg: 'rgba(255,196,120,0.2)',  color: '#7A4A08' },
   'Check-Out':   { bg: 'rgba(226,140,100,0.2)',  color: '#7A2A0E' },
 };
+
+
+// ── Villa Search Dropdown ─────────────────────────────────────
+function VillaSearch({ value, onChange, squad }: { value: string; onChange: (v: string) => void; squad: string }) {
+  const [query, setQuery] = useState(value);
+  const [open, setOpen] = useState(false);
+
+  const results = query.length > 0
+    ? PROPERTIES
+        .filter(p => p.name.toLowerCase().includes(query.toLowerCase()) || p.address.toLowerCase().includes(query.toLowerCase()))
+        .sort((a, b) => (squad && a.squad === squad ? -1 : 0) - (squad && b.squad === squad ? -1 : 0))
+        .slice(0, 12)
+    : PROPERTIES.filter(p => !squad || p.squad === squad).slice(0, 12);
+
+  function select(name: string) { setQuery(name); onChange(name); setOpen(false); }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input className="sv-input" style={{ width: '100%' }} placeholder="Search villa name…"
+        value={query}
+        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 180)} />
+      {open && results.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
+          {results.map(p => (
+            <div key={p.id} onMouseDown={() => select(p.name)}
+              style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '0.5px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: p.squad === 'Lonavala' ? '#9CCCFC' : '#97C459' }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 1 }}>{p.squad} · {p.kms} km</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Assign Task Modal ────────────────────────────────────────
 function AssignTaskModal({
@@ -188,7 +229,7 @@ function AssignTaskModal({
             {/* Property */}
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Villa / Property</div>
-              <input className="sv-input" style={{ width: '100%' }} placeholder="Type villa / property name" value={form.property_id} onChange={e => setForm(f => ({ ...f, property_id: e.target.value }))} />
+              <VillaSearch value={form.property_id} onChange={v => setForm(f => ({ ...f, property_id: v }))} squad={butler?.squad || ''} />
             </div>
 
             {/* Due time */}
