@@ -146,28 +146,28 @@ export default function TasksPage() {
   const [filter, setFilter] = useState('All');
   const [completeTask, setCompleteTask] = useState<any | null>(null);
 
-  const isSuper = user && isSupervisor(user.role as any);
+  const isSuper = user ? isSupervisor(user.role as any) : false;
 
-  async function load() {
+  async function load(currentUser = user) {
+    if (!currentUser) return;
     const sb = getServiceSupabase();
-    if (user && !isSuper) {
-      console.log('[Tasks] Loading for user:', user.id, user.name, user.role);
-      // Fetch ALL tasks then filter client-side to handle any ID/name mismatch
-      const { data: allTasks, error } = await sb
+    const supervisor = isSupervisor(currentUser.role as any);
+
+    if (!supervisor) {
+      // Butler: fetch ALL tasks, filter client-side by butler_id or notes
+      const { data: allTasks } = await sb
         .from('tasks').select('*, profiles(name)')
         .order('created_at', { ascending: false });
-      console.log('[Tasks] All tasks count:', allTasks?.length, 'error:', error?.message);
       if (allTasks) {
-        const mine = allTasks.filter((t: any) => {
-          const matchId = t.butler_id === user.id;
-          const matchNoteId = t.notes?.includes(`ButlerID: ${user.id}`);
-          const matchName = t.notes?.includes(`Butler: ${user.name}`);
-          return matchId || matchNoteId || matchName;
-        });
-        console.log('[Tasks] My tasks:', mine.length);
+        const mine = allTasks.filter((t: any) =>
+          t.butler_id === currentUser.id ||
+          t.notes?.includes(`ButlerID: ${currentUser.id}`) ||
+          t.notes?.includes(`Butler: ${currentUser.name}`)
+        );
         setTasks(mine as any);
       }
     } else {
+      // Admin/supervisor: all tasks
       const { data } = await sb
         .from('tasks').select('*, profiles(name)')
         .order('created_at', { ascending: false });
@@ -176,11 +176,22 @@ export default function TasksPage() {
     setLoading(false);
   }
 
-  useEffect(() => { if (user) load(); }, [user]);
-
-  // Poll every 15s so admin sees butler completions in near real-time
   useEffect(() => {
-    const t = setInterval(() => { if (user) load(); }, 15000);
+    // Read user directly from localStorage to avoid stale closure
+    const stored = localStorage.getItem('sv_local_session');
+    if (stored) {
+      try {
+        const localUser = JSON.parse(stored);
+        load(localUser);
+      } catch {}
+    }
+  }, []);
+
+  useEffect(() => { if (user) load(user); }, [user]);
+
+  // Poll every 15s
+  useEffect(() => {
+    const t = setInterval(() => { if (user) load(user); }, 15000);
     return () => clearInterval(t);
   }, [user]);
 
