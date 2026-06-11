@@ -551,7 +551,7 @@ export default function HuddlePage() {
                             {!isSuper && user && (
                               <ButlerAttendButton huddleId={h.id} butlerId={user.id} />
                             )}
-                            {h.hasQuiz && (
+                            {h.hasQuiz && !isSuper && (
                               <a href={`/huddle-quiz?huddle=${h.id}`} style={{ textDecoration: 'none' }}>
                                 <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '3px 10px', background: '#97C459', border: 'none' }}>
                                   📝 Take quiz
@@ -621,7 +621,7 @@ export default function HuddlePage() {
                             <td>
                               <div style={{ display: 'flex', gap: 6 }}>
                                 {isSuper && h.status !== 'completed' && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setAttendanceHuddle(h)}>Attendance</button>}
-                                {h.hasQuiz && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setScoresHuddle(h)}>Scores</button>}
+                                {h.hasQuiz && isSuper && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setScoresHuddle(h)}>Scores</button>}
                                 {h.hasQuiz && !isSuper && (
                                   <a href={`/huddle-quiz?huddle=${h.id}`} style={{ textDecoration: 'none' }}>
                                     <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '4px 8px', background: '#97C459', border: 'none', color: '#fff' }}>📝 Take quiz</button>
