@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { getSupabase, fetchQuizzes, fetchQuizQuestions, createQuiz, submitQuizAttempt, fetchTrainings, type Quiz, type QuizQuestion, type Training } from '@/lib/supabase';
+import { getSupabase, getServiceSupabase, fetchQuizzes, fetchQuizQuestions, createQuiz, submitQuizAttempt, fetchTrainings, type Quiz, type QuizQuestion, type Training } from '@/lib/supabase';
 import { getCurrentUser, isSupervisor } from '@/lib/auth';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -349,7 +349,7 @@ export default function QuizPage() {
     const [q, t, a] = await Promise.all([
       fetchQuizzes(),
       fetchTrainings(),
-      getSupabase().from('quiz_attempts').select('*, profiles(name), quizzes(title)').order('attempted_at', { ascending: false }).limit(30),
+      getServiceSupabase().from('quiz_attempts').select('*, profiles(name), quizzes(title)').order('attempted_at', { ascending: false }).limit(30),
     ]);
     setQuizzes(q as QuizWithTraining[]);
     setTrainings(t);

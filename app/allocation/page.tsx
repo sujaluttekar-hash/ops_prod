@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, getServiceSupabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
 
@@ -64,7 +64,7 @@ function AssignTaskModal({
     e.preventDefault();
     setSaving(true); setError('');
     try {
-      const { error: err } = await getSupabase().from('tasks').insert({
+      const { error: err } = await getServiceSupabase().from('tasks').insert({
         type: form.task_type || form.booking_type,
         butler_id: butler.id,
         property_id: form.property_id || null,
@@ -336,7 +336,7 @@ export default function AllocationPage() {
   }
 
   useEffect(() => {
-    getSupabase().from('properties').select('id, name').order('name').then((res: any) => setProperties(res.data ?? []));
+    getServiceSupabase().from('properties').select('id, name').order('name').then((res: any) => setProperties(res.data ?? []));
   }, []);
 
   useEffect(() => { loadAllocations(); }, [date, squad]);
@@ -344,7 +344,7 @@ export default function AllocationPage() {
   const loadAllocations = async () => {
     setLoading(true);
     try {
-      let q = getSupabase().from('profiles').select('*').eq('role', 'butler').eq('is_active', true);
+      let q = getServiceSupabase().from('profiles').select('*').eq('role', 'butler').eq('is_active', true);
       if (squad !== 'All') q = q.eq('squad', squad);
       const { data: butlers } = await q;
       if (!butlers) { setAllocations([]); setLoading(false); return; }

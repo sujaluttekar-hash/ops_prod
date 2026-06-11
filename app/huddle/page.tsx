@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchHuddles, fetchProfiles, getSupabase, type Huddle, type Profile } from '@/lib/supabase';
+import { fetchHuddles, fetchProfiles, getSupabase, getServiceSupabase, type Huddle, type Profile } from '@/lib/supabase';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
@@ -228,7 +228,7 @@ function AttendanceModal({ huddle, profiles, onClose, onSaved }: { huddle: Huddl
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    getSupabase().from('huddle_attendance').select('butler_id, attended').eq('huddle_id', huddle.id).then((res: any) => {
+    getServiceSupabase().from('huddle_attendance').select('butler_id, attended').eq('huddle_id', huddle.id).then((res: any) => {
       if (res.data) setAttended(new Set(res.data.filter((r: any) => r.attended).map((r: any) => r.butler_id)));
     });
   }, [huddle.id]);
@@ -307,7 +307,7 @@ function ScoresModal({ huddle, onClose }: { huddle: HuddleWithStats; onClose: ()
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getSupabase().from('huddle_quiz_attempts').select('*, profiles(name, squad)').eq('huddle_id', huddle.id).order('percentage', { ascending: false }).then((res: any) => { setScores(res.data ?? []); setLoading(false); });
+    getServiceSupabase().from('huddle_quiz_attempts').select('*, profiles(name, squad)').eq('huddle_id', huddle.id).order('percentage', { ascending: false }).then((res: any) => { setScores(res.data ?? []); setLoading(false); });
   }, [huddle.id]);
 
   return (
@@ -573,7 +573,7 @@ export default function HuddlePage() {
                                 {isSuper && h.status !== 'completed' && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setAttendanceHuddle(h)}>Attendance</button>}
                                 {h.hasQuiz && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setScoresHuddle(h)}>Scores</button>}
                                 {isSuper && <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px', color: '#8B2020', borderColor: '#E9A0A7' }}
-                                  onClick={async () => { if (confirm('Delete this huddle?')) { await getSupabase().from('huddles').delete().eq('id', h.id); load(); } }}>
+                                  onClick={async () => { if (confirm('Delete this huddle?')) { await getServiceSupabase().from('huddles').delete().eq('id', h.id); load(); } }}>
                                   ✕
                                 </button>}
                               </div>

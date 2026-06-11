@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchDashboardStats, fetchProfiles, fetchTrainings, fetchGuestDelights, fetchHuddles, getSupabase, type Profile, type Training } from '@/lib/supabase';
+import { fetchDashboardStats, fetchProfiles, fetchTrainings, fetchGuestDelights, fetchHuddles, getSupabase, getServiceSupabase, type Profile, type Training } from '@/lib/supabase';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 
 export default function ReportsPage() {
@@ -20,8 +20,8 @@ export default function ReportsPage() {
       fetchTrainings(),
       fetchGuestDelights(),
       fetchHuddles(),
-      getSupabase().from('quiz_attempts').select('butler_id, score, total, passed'),
-      getSupabase().from('huddle_attendance').select('butler_id, attended'),
+      getServiceSupabase().from('quiz_attempts').select('butler_id, score, total, passed'),
+      getServiceSupabase().from('huddle_attendance').select('butler_id, attended'),
     ]).then(([s, p, t, d, h, qa, ha]) => {
       setStats(s);
       setProfiles(p);

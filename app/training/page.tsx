@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchTrainings, fetchProfiles, getSupabase, type Training, type Profile } from '@/lib/supabase';
+import { fetchTrainings, fetchProfiles, getSupabase, getServiceSupabase, type Training, type Profile } from '@/lib/supabase';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
@@ -27,7 +27,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
     e.preventDefault();
     setSaving(true); setError('');
     try {
-      const { error: err } = await getSupabase().from('trainings').insert({
+      const { error: err } = await getServiceSupabase().from('trainings').insert({
         name: form.name,
         training_date: form.training_date || null,
         type: form.type,
@@ -121,7 +121,7 @@ function AttendanceModal({ training, profiles, onClose, onSaved }: { training: T
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    getSupabase().from('training_attendance').select('butler_id, attended').eq('training_id', training.id).then((res: any) => {
+    getServiceSupabase().from('training_attendance').select('butler_id, attended').eq('training_id', training.id).then((res: any) => {
       if (res.data) setAttended(new Set(res.data.filter((r: any) => r.attended).map((r: any) => r.butler_id)));
     });
   }, [training.id]);
@@ -219,7 +219,7 @@ export default function TrainingPage() {
     } else if (user) {
       const [t, att] = await Promise.all([
         fetchTrainings(),
-        getSupabase().from('training_attendance').select('training_id').eq('butler_id', user.id).eq('attended', true),
+        getServiceSupabase().from('training_attendance').select('training_id').eq('butler_id', user.id).eq('attended', true),
       ]);
       const myIds = new Set((att.data || []).map((a: any) => a.training_id));
       setTrainings(t.filter(tr => tr.status !== 'completed' || myIds.has(tr.id)));
@@ -343,7 +343,7 @@ export default function TrainingPage() {
                               style={{ fontSize: 11, padding: '4px 10px', color: '#8B2020', borderColor: '#E9A0A7' }}
                               onClick={async () => {
                                 if (confirm('Delete this training?')) {
-                                  await getSupabase().from('trainings').delete().eq('id', t.id);
+                                  await getServiceSupabase().from('trainings').delete().eq('id', t.id);
                                   load();
                                 }
                               }}

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchProfiles, fetchGuestDelights, fetchHuddles, fetchTrainings, getSupabase, type Profile, type GuestDelight, type Huddle, type Training } from '@/lib/supabase';
+import { fetchProfiles, fetchGuestDelights, fetchHuddles, fetchTrainings, getSupabase, getServiceSupabase, type Profile, type GuestDelight, type Huddle, type Training } from '@/lib/supabase';
 
 type DayEvent = {
   type: 'delight' | 'huddle' | 'training' | 'task';
@@ -58,7 +58,7 @@ export default function ButlerCalendarPage() {
       fetchGuestDelights(),
       fetchHuddles(),
       fetchTrainings(),
-      getSupabase().from('huddle_attendance')
+      getServiceSupabase().from('huddle_attendance')
         .select('huddle_id, attended')
         .eq('butler_id', selectedButler.id),
     ]).then(([d, h, t, att]) => {

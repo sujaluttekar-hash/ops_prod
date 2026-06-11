@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchGuestDelights, insertGuestDelight, uploadDelightPhoto, getSupabase, BUCKETS, type GuestDelight } from '@/lib/supabase';
+import { fetchGuestDelights, insertGuestDelight, uploadDelightPhoto, getSupabase, getServiceSupabase, BUCKETS, type GuestDelight } from '@/lib/supabase';
 import { getCurrentUser, isSupervisor, type AppUser } from '@/lib/auth';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 
@@ -77,7 +77,7 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
         }
         // Auto-complete if all 7 photos uploaded
         if (uploadCount === PHOTO_POINTERS.length) {
-          await getSupabase().from('guest_delights').update({ status: 'completed' }).eq('id', data.id);
+          await getServiceSupabase().from('guest_delights').update({ status: 'completed' }).eq('id', data.id);
         }
       }
       setSaved(true);

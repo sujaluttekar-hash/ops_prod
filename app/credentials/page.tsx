@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchCredentials, getSupabase, type Credential } from '@/lib/supabase';
+import { fetchCredentials, getSupabase, getServiceSupabase, type Credential } from '@/lib/supabase';
 
 const typeIcon: Record<string,string> = { wifi:'📶', device:'📺', key:'🔑', vendor:'🏢', login:'🔐' };
 const typeBg: Record<string,string> = { wifi:'rgba(156,204,252,0.15)', device:'rgba(254,213,169,0.2)', key:'rgba(233,160,167,0.15)', vendor:'rgba(151,196,89,0.12)', login:'rgba(156,204,252,0.1)' };
@@ -17,7 +17,7 @@ export default function CredentialsPage() {
     async function load() {
       const [creds, log] = await Promise.all([
         fetchCredentials(),
-        getSupabase().from('credential_access_log').select('*, profiles(name), credentials(name)').order('accessed_at', { ascending: false }).limit(10),
+        getServiceSupabase().from('credential_access_log').select('*, profiles(name), credentials(name)').order('accessed_at', { ascending: false }).limit(10),
       ]);
       setCredentials(creds);
       setAccessLog(log.data ?? []);

@@ -226,21 +226,21 @@ export async function fetchButlerActivityForMonth(butlerId: string, year: number
 
 export async function insertGuestDelight(payload: any) {
   try {
-    const { data, error } = await getSupabase().from('guest_delights').insert(payload).select().single()
+    const { data, error } = await getServiceSupabase().from('guest_delights').insert(payload).select().single()
     return { data, error }
   } catch (e: any) { return { data: null, error: e } }
 }
 
 export async function insertTask(payload: any) {
   try {
-    const { data, error } = await getSupabase().from('tasks').insert(payload).select().single()
+    const { data, error } = await getServiceSupabase().from('tasks').insert(payload).select().single()
     return { data, error }
   } catch (e: any) { return { data: null, error: e } }
 }
 
 export async function insertSubmission(payload: any) {
   try {
-    const { data, error } = await getSupabase().from('submissions').insert(payload).select().single()
+    const { data, error } = await getServiceSupabase().from('submissions').insert(payload).select().single()
     if (!error) return { data, error }
     return insertTask({ type: payload.task_type, butler_id: payload.butler_id, status: payload.status || 'pending', notes: payload.notes, photo_path: payload.photo_url })
   } catch (e: any) { return { data: null, error: e } }
@@ -248,18 +248,17 @@ export async function insertSubmission(payload: any) {
 
 export async function updateTaskStatus(id: string, status: string) {
   try {
-    const { data, error } = await getSupabase().from('tasks').update({ status, updated_at: new Date().toISOString() }).eq('id', id).select().single()
+    const { data, error } = await getServiceSupabase().from('tasks').update({ status, updated_at: new Date().toISOString() }).eq('id', id).select().single()
     return { data, error }
   } catch (e: any) { return { data: null, error: e } }
 }
 
 export async function createQuiz(payload: any) {
   try {
-    const sb = getSupabase()
-    const { data: { user } } = await sb.auth.getUser()
+    const sb = getServiceSupabase()
     const { data: quiz, error: quizErr } = await sb.from('quizzes').insert({
       title: payload.title, description: payload.description || null,
-      training_id: payload.training_id || null, created_by: user?.id || null,
+      training_id: payload.training_id || null, created_by: null,
       is_active: true, pass_percentage: payload.pass_percentage ?? 70,
       time_limit_minutes: payload.time_limit_minutes ?? null,
     }).select().single()
@@ -277,7 +276,7 @@ export async function createQuiz(payload: any) {
 
 export async function submitQuizAttempt(payload: any) {
   try {
-    const { data, error } = await getSupabase().from('quiz_attempts').insert({
+    const { data, error } = await getServiceSupabase().from('quiz_attempts').insert({
       quiz_id: payload.quiz_id, butler_id: payload.butler_id,
       score: payload.score, passed: payload.passed, attempted_at: new Date().toISOString(),
     }).select().single()
@@ -287,9 +286,9 @@ export async function submitQuizAttempt(payload: any) {
 
 export async function uploadPhoto(bucket: string, file: File, path: string) {
   try {
-    const { data, error } = await getSupabase().storage.from(bucket).upload(path, file, { upsert: true })
+    const { data, error } = await getServiceSupabase().storage.from(bucket).upload(path, file, { upsert: true })
     if (error) return { error, publicUrl: null }
-    const { data: { publicUrl } } = getSupabase().storage.from(bucket).getPublicUrl(data.path)
+    const { data: { publicUrl } } = getServiceSupabase().storage.from(bucket).getPublicUrl(data.path)
     return { error: null, publicUrl }
   } catch (e: any) { return { error: e, publicUrl: null } }
 }
@@ -298,7 +297,7 @@ export async function uploadDelightPhoto(delightId: string, pointerKey: string, 
   const path = `${delightId}/${pointerKey}_${Date.now()}.${file.name.split('.').pop()}`
   const { error: uploadErr, publicUrl } = await uploadPhoto(BUCKETS.delightPhotos, file, path)
   if (uploadErr) return { error: uploadErr }
-  const { error: dbErr } = await getSupabase().from('delight_photos').insert({
+  const { error: dbErr } = await getServiceSupabase().from('delight_photos').insert({
     delight_id: delightId, pointer_key: pointerKey, storage_path: path,
     public_url: publicUrl, captured_at: capturedAt ? new Date().toISOString() : null,
   })

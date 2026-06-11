@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { getSupabase, fetchProfiles, type Profile } from '@/lib/supabase';
+import { getSupabase, getServiceSupabase, fetchProfiles, type Profile } from '@/lib/supabase';
 import { getShiftClass } from '@/lib/utils';
 
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -15,7 +15,7 @@ export default function RosterPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await getSupabase().from('rosters').select('*, profiles(*)').order('week_start', { ascending: false });
+      const { data } = await getServiceSupabase().from('rosters').select('*, profiles(*)').order('week_start', { ascending: false });
       setRoster(data ?? []);
       setLoading(false);
     }

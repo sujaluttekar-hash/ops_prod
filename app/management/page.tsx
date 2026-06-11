@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchProfiles, getSupabase, type Profile } from '@/lib/supabase';
+import { fetchProfiles, getSupabase, getServiceSupabase, type Profile } from '@/lib/supabase';
 import { getCurrentUser, isAdmin, getRoleLabel, type AppUser } from '@/lib/auth';
 
 export default function ManagementPage() {
@@ -24,7 +24,7 @@ export default function ManagementPage() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true); setError('');
-    const { error: err } = await getSupabase().from('profiles').insert({
+    const { error: err } = await getServiceSupabase().from('profiles').insert({
       id: crypto.randomUUID(),
       name: form.name,
       email: form.email,
@@ -38,7 +38,7 @@ export default function ManagementPage() {
   }
 
   async function toggleActive(id: string, current: boolean) {
-    await getSupabase().from('profiles').update({ is_active: !current }).eq('id', id);
+    await getServiceSupabase().from('profiles').update({ is_active: !current }).eq('id', id);
     load();
   }
 
