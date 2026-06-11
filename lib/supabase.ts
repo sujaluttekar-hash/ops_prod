@@ -459,3 +459,15 @@ export async function uploadTaskPhoto(file: File, submissionId: string): Promise
   if (error) return null
   return publicUrl
 }
+
+// Export Credential type for credentials page
+export type Credential = {
+  id: string
+  name: string
+  type: string
+  property: string
+  value: string
+  expiry: string | null
+  expiry_warning: boolean
+  created_at: string
+}
