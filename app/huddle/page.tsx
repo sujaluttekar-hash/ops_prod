@@ -62,7 +62,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
       const { data: butlers } = await sb.from('profiles').select('id').eq('role', 'butler').eq('is_active', true);
       if (butlers && butlers.length > 0) {
         await sb.from('notifications').insert(
-          butlers.map(b => ({
+          butlers.map((b: any) => ({
             user_id: b.id,
             title: `Huddle scheduled: ${form.team}`,
             body: `Scheduled for ${new Date(form.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${form.time ? ' at ' + form.time.slice(0,5) : ''}${addQuiz ? ' · Quiz included' : ''}`,
@@ -226,8 +226,8 @@ function AttendanceModal({ huddle, profiles, onClose, onSaved }: { huddle: Huddl
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    getSupabase().from('huddle_attendance').select('butler_id, attended').eq('huddle_id', huddle.id).then(({ data }) => {
-      if (data) setAttended(new Set(data.filter(r => r.attended).map(r => r.butler_id)));
+    getSupabase().from('huddle_attendance').select('butler_id, attended').eq('huddle_id', huddle.id).then((res: any) => {
+      if (res.data) setAttended(new Set(res.data.filter((r: any) => r.attended).map((r: any) => r.butler_id)));
     });
   }, [huddle.id]);
 
@@ -305,7 +305,7 @@ function ScoresModal({ huddle, onClose }: { huddle: HuddleWithStats; onClose: ()
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getSupabase().from('huddle_quiz_attempts').select('*, profiles(name, squad)').eq('huddle_id', huddle.id).order('percentage', { ascending: false }).then(({ data }) => { setScores(data ?? []); setLoading(false); });
+    getSupabase().from('huddle_quiz_attempts').select('*, profiles(name, squad)').eq('huddle_id', huddle.id).order('percentage', { ascending: false }).then((res: any) => { setScores(res.data ?? []); setLoading(false); });
   }, [huddle.id]);
 
   return (

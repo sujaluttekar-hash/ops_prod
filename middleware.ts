@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Auth guard — handled client-side via auth-context
 export function middleware(request: NextRequest) {
-  // Auth guard disabled temporarily — handled client-side
   return NextResponse.next();
 }
 

@@ -15,6 +15,7 @@ const navByRole: Record<string, { overview: NavItem[]; operations: NavItem[]; le
       { label: 'Tasks', href: '/tasks', icon: '✓' },
       { label: 'Roster', href: '/roster', icon: '👥' },
       { label: 'Huddles', href: '/huddle', icon: '💬' },
+      { label: 'Butler calendar', href: '/butler-calendar', icon: '🗓' },
     ],
     learning: [
       { label: 'Training', href: '/training', icon: '📚' },
@@ -22,7 +23,7 @@ const navByRole: Record<string, { overview: NavItem[]; operations: NavItem[]; le
     ],
     admin: [
       { label: 'Credentials', href: '/credentials', icon: '🔐' },
-      { label: 'Reports', href: '/reports', icon: '📈' },
+      { label: 'MIS & Reports', href: '/reports', icon: '📈' },
       { label: 'Management', href: '/management', icon: '⚙' },
     ],
   },
@@ -34,12 +35,15 @@ const navByRole: Record<string, { overview: NavItem[]; operations: NavItem[]; le
       { label: 'Tasks', href: '/tasks', icon: '✓' },
       { label: 'Roster', href: '/roster', icon: '👥' },
       { label: 'Huddles', href: '/huddle', icon: '💬' },
+      { label: 'Butler calendar', href: '/butler-calendar', icon: '🗓' },
     ],
     learning: [
       { label: 'Training', href: '/training', icon: '📚' },
       { label: 'Quizzes', href: '/quiz', icon: '❓' },
     ],
-    admin: [],
+    admin: [
+      { label: 'MIS & Reports', href: '/reports', icon: '📈' },
+    ],
   },
   butler: {
     overview: [{ label: 'Dashboard', href: '/dashboard', icon: '📊' }],
@@ -47,6 +51,7 @@ const navByRole: Record<string, { overview: NavItem[]; operations: NavItem[]; le
       { label: 'Log activity', href: '/delight', icon: '🎁' },
       { label: 'Submit task', href: '/submit', icon: '✓' },
       { label: 'My roster', href: '/roster', icon: '👤' },
+      { label: 'My calendar', href: '/butler-calendar', icon: '🗓' },
     ],
     learning: [
       { label: 'My trainings', href: '/training', icon: '📚' },

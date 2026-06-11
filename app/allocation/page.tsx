@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { getSupabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { isSupervisor } from '@/lib/auth';
 
 type ButlerAllocation = {
   id: string;
@@ -16,70 +17,358 @@ type ButlerAllocation = {
   tasks: any[];
 };
 
+// All booking types matching the delight/task system
+const BOOKING_TYPES = ['Non Booking', 'Booking', 'Check-In', 'Check-Out'] as const;
+const TASK_TYPES = ['Arrival selfie', 'Guest welcome', 'Table layout', 'Exit selfie'] as const;
+
+const TASK_EMOJIS: Record<string, string> = {
+  'Arrival selfie': '🤳',
+  'Guest welcome': '🙏',
+  'Table layout': '🍽',
+  'Exit selfie': '👋',
+};
+
+const BOOKING_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+  'Non Booking': { bg: 'rgba(156,204,252,0.15)', color: '#0C447C' },
+  'Booking':     { bg: 'rgba(151,196,89,0.15)',  color: '#2D5A0E' },
+  'Check-In':    { bg: 'rgba(255,196,120,0.2)',  color: '#7A4A08' },
+  'Check-Out':   { bg: 'rgba(226,140,100,0.2)',  color: '#7A2A0E' },
+};
+
+// ─── Assign Task Modal ────────────────────────────────────────
+function AssignTaskModal({
+  butler,
+  date,
+  properties,
+  onClose,
+  onSaved,
+}: {
+  butler: ButlerAllocation;
+  date: string;
+  properties: { id: string; name: string }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    booking_type: 'Booking' as typeof BOOKING_TYPES[number],
+    task_type: '' as string,
+    property_id: '',
+    due_time: '',
+    notes: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setError('');
+    try {
+      const { error: err } = await getSupabase().from('tasks').insert({
+        type: form.task_type || form.booking_type,
+        butler_id: butler.id,
+        property_id: form.property_id || null,
+        status: 'pending',
+        due_time: form.due_time || null,
+        notes: form.notes || null,
+        created_at: `${date}T${form.due_time || '08:00'}:00`,
+      });
+      if (err) throw new Error(err.message);
+      setSaved(true);
+      setTimeout(() => { onSaved(); onClose(); }, 800);
+    } catch (err: any) { setError(err.message); setSaving(false); }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Assign task</div>
+            <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>
+              <span className="sv-avatar" style={{ display: 'inline-flex', width: 20, height: 20, fontSize: 9, marginRight: 6 }}>{butler.name.slice(0,2).toUpperCase()}</span>
+              {butler.name} · {butler.squad}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
+        </div>
+        <div className="sv-strip" style={{ marginBottom: 20 }} />
+
+        {saved ? (
+          <div style={{ textAlign: 'center', padding: '32px 0' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Task assigned!</div>
+            <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginTop: 4 }}>{butler.name} has been notified.</div>
+          </div>
+        ) : (
+          <form onSubmit={handleSave}>
+            {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
+
+            {/* Booking type — 4 options */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Booking type *</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                {BOOKING_TYPES.map(bt => {
+                  const c = BOOKING_TYPE_COLORS[bt];
+                  const active = form.booking_type === bt;
+                  return (
+                    <button key={bt} type="button"
+                      onClick={() => setForm(f => ({ ...f, booking_type: bt }))}
+                      style={{
+                        padding: '10px 8px',
+                        borderRadius: 10,
+                        border: `1.5px solid ${active ? c.color : 'rgba(0,0,0,0.1)'}`,
+                        background: active ? c.bg : 'white',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        fontSize: 13,
+                        fontWeight: active ? 700 : 400,
+                        color: active ? c.color : 'var(--sv-dark)',
+                        transition: 'all 0.15s',
+                      }}>
+                      {bt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Task type */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Task type</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
+                {TASK_TYPES.map(tt => (
+                  <button key={tt} type="button"
+                    onClick={() => setForm(f => ({ ...f, task_type: f.task_type === tt ? '' : tt }))}
+                    style={{ padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${form.task_type === tt ? '#9CCCFC' : 'rgba(0,0,0,0.1)'}`, background: form.task_type === tt ? 'rgba(156,204,252,0.1)' : 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: form.task_type === tt ? 600 : 400, transition: 'all 0.12s' }}>
+                    <span style={{ fontSize: 18 }}>{TASK_EMOJIS[tt]}</span> {tt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Property */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Villa / Property</div>
+              <select className="sv-select" style={{ width: '100%' }} value={form.property_id} onChange={e => setForm(f => ({ ...f, property_id: e.target.value }))}>
+                <option value="">Select property</option>
+                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+
+            {/* Due time */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Due time</div>
+              <input className="sv-input" style={{ width: '100%' }} type="time" value={form.due_time} onChange={e => setForm(f => ({ ...f, due_time: e.target.value }))} />
+            </div>
+
+            {/* Notes */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Notes</div>
+              <textarea className="sv-input" style={{ width: '100%', minHeight: 60, resize: 'vertical' }} placeholder="Instructions for the butler…" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
+              <button type="submit" className="sv-btn sv-btn-primary" disabled={saving}>{saving ? 'Assigning…' : 'Assign task'}</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Butler detail row (expanded) ────────────────────────────
+function ButlerDetailRow({ alloc, onAssign }: { alloc: ButlerAllocation; onAssign: () => void }) {
+  return (
+    <tr>
+      <td colSpan={8} style={{ background: 'rgba(0,0,0,0.018)', padding: 0 }}>
+        <div style={{ padding: '16px 20px' }}>
+          {alloc.tasks.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ fontSize: 13, color: 'var(--muted-fg)' }}>No tasks assigned for this date.</div>
+              <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={onAssign}>Assign task</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                Task breakdown
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                {alloc.tasks.map((t: any, i: number) => (
+                  <div key={i} style={{ background: t.status === 'completed' ? 'rgba(151,196,89,0.12)' : t.status === 'delayed' ? 'rgba(226,75,74,0.08)' : 'var(--muted)', borderRadius: 8, padding: '8px 12px', fontSize: 12, border: `0.5px solid ${t.status === 'completed' ? '#97C459' : t.status === 'delayed' ? '#E9A0A7' : 'rgba(0,0,0,0.08)'}` }}>
+                    <div style={{ fontWeight: 600, marginBottom: 2 }}>{TASK_EMOJIS[t.type] || '✓'} {t.type}</div>
+                    <div style={{ color: 'var(--muted-fg)', fontSize: 11 }}>{t.due_time || '—'} · {t.status}</div>
+                  </div>
+                ))}
+              </div>
+              <button className="sv-btn sv-btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} onClick={onAssign}>+ Assign another task</button>
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ─── Butler Utilization Panel (admin/supervisor only) ─────────
+function UtilizationPanel({ allocations }: { allocations: ButlerAllocation[] }) {
+  const total = allocations.length;
+  const assigned = allocations.filter(a => a.totalTasks > 0).length;
+  const unassigned = total - assigned;
+  const utilizationPct = total > 0 ? Math.round(assigned / total * 100) : 0;
+  const avgTasksPerButler = total > 0 ? (allocations.reduce((s, a) => s + a.totalTasks, 0) / total).toFixed(1) : '0';
+  const avgCompletionPct = assigned > 0
+    ? Math.round(allocations.filter(a => a.totalTasks > 0).reduce((s, a) => s + (a.completedTasks / a.totalTasks * 100), 0) / assigned)
+    : 0;
+
+  // Task type breakdown across all butlers
+  const typeBreakdown: Record<string, number> = {};
+  allocations.forEach(a => {
+    Object.entries(a.taskBreakdown).forEach(([type, count]) => {
+      typeBreakdown[type] = (typeBreakdown[type] || 0) + count;
+    });
+  });
+  const totalTypeTasks = Object.values(typeBreakdown).reduce((s, v) => s + v, 0);
+
+  return (
+    <div className="sv-card" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 700 }}>Butler utilization</div>
+        <span style={{ fontSize: 11, background: 'rgba(156,204,252,0.15)', color: '#0C447C', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>Admin & supervisor only</span>
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginBottom: 16 }}>How effectively the butler team is deployed today</div>
+
+      {/* Utilization gauge row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Utilization', value: `${utilizationPct}%`, sub: `${assigned}/${total} assigned`, color: utilizationPct >= 80 ? '#2D5A0E' : utilizationPct >= 50 ? '#7A4A08' : '#8B2020', bg: utilizationPct >= 80 ? 'rgba(151,196,89,0.1)' : utilizationPct >= 50 ? 'rgba(255,196,120,0.15)' : 'rgba(226,75,74,0.08)' },
+          { label: 'Avg tasks/butler', value: avgTasksPerButler, sub: 'across all butlers', color: '#0C447C', bg: 'rgba(156,204,252,0.1)' },
+          { label: 'Avg completion', value: `${avgCompletionPct}%`, sub: 'of assigned tasks', color: avgCompletionPct >= 80 ? '#2D5A0E' : '#7A4A08', bg: avgCompletionPct >= 80 ? 'rgba(151,196,89,0.1)' : 'rgba(255,196,120,0.15)' },
+          { label: 'Unassigned', value: unassigned, sub: 'need tasks today', color: unassigned > 0 ? '#8B2020' : '#2D5A0E', bg: unassigned > 0 ? 'rgba(226,75,74,0.08)' : 'rgba(151,196,89,0.08)' },
+        ].map(m => (
+          <div key={m.label} style={{ background: m.bg, borderRadius: 10, padding: '14px 16px' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{m.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: m.color }}>{m.value}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 3 }}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Utilization bar per butler */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Per-butler view</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {allocations.map(a => {
+          const pct = a.totalTasks > 0 ? Math.round(a.completedTasks / a.totalTasks * 100) : 0;
+          return (
+            <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #9CCCFC, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                {a.name.slice(0,2).toUpperCase()}
+              </div>
+              <div style={{ width: 100, fontSize: 12, fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <div style={{ height: 7, borderRadius: 4, background: 'rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    borderRadius: 4,
+                    background: a.status === 'delayed' ? '#E9A0A7' : a.totalTasks === 0 ? 'rgba(0,0,0,0.1)' : pct === 100 ? '#97C459' : '#9CCCFC',
+                    width: a.totalTasks === 0 ? '4px' : `${pct}%`,
+                    transition: 'width 0.4s ease',
+                  }} />
+                </div>
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, width: 60, textAlign: 'right', flexShrink: 0, color: a.totalTasks === 0 ? 'var(--muted-fg)' : pct === 100 ? '#2D5A0E' : '#0C447C' }}>
+                {a.totalTasks === 0 ? 'No tasks' : `${a.completedTasks}/${a.totalTasks}`}
+              </div>
+              <div style={{ width: 70, flexShrink: 0 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: a.status === 'delayed' ? 'rgba(233,160,167,0.15)' : a.status === 'on_track' ? 'rgba(151,196,89,0.15)' : 'rgba(0,0,0,0.06)', color: a.status === 'delayed' ? '#8B2020' : a.status === 'on_track' ? '#2D5A0E' : 'var(--muted-fg)' }}>
+                  {a.status === 'delayed' ? 'Delayed' : a.status === 'on_track' ? 'On track' : 'Empty'}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+        {allocations.length === 0 && <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>No butler data for this date.</div>}
+      </div>
+
+      {/* Task type breakdown */}
+      {totalTypeTasks > 0 && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12, marginTop: 20 }}>Task type breakdown</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {Object.entries(typeBreakdown).filter(([, v]) => v > 0).map(([type, count]) => (
+              <div key={type} style={{ background: 'var(--muted)', borderRadius: 8, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>{TASK_EMOJIS[type] || '✓'}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{count}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted-fg)' }}>{type}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────
 export default function AllocationPage() {
   const { user } = useAuth();
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [squad, setSquad] = useState<string>('All');
   const [allocations, setAllocations] = useState<ButlerAllocation[]>([]);
   const [expandedButler, setExpandedButler] = useState<string | null>(null);
+  const [assigningButler, setAssigningButler] = useState<ButlerAllocation | null>(null);
+  const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isSuper = user && isSupervisor(user.role as any);
+
+  // Block butlers entirely
+  if (user?.role === 'butler') {
+    return (
+      <>
+        <Topbar title="Allocation" subtitle="You don't have access to this page" actions={null} />
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted-fg)', fontSize: 14 }}>
+          This section is for supervisors and admins only.
+        </div>
+      </>
+    );
+  }
+
   useEffect(() => {
-    loadAllocations();
-  }, [date, squad]);
+    getSupabase().from('properties').select('id, name').order('name').then((res: any) => setProperties(res.data ?? []));
+  }, []);
+
+  useEffect(() => { loadAllocations(); }, [date, squad]);
 
   const loadAllocations = async () => {
     setLoading(true);
     try {
-      let q = getSupabase()
-        .from('profiles')
-        .select('*')
-        .eq('role', 'butler');
-
-      if (squad !== 'All') {
-        q = q.eq('squad', squad);
-      }
-
+      let q = getSupabase().from('profiles').select('*').eq('role', 'butler').eq('is_active', true);
+      if (squad !== 'All') q = q.eq('squad', squad);
       const { data: butlers } = await q;
-
-      if (!butlers) {
-        setAllocations([]);
-        setLoading(false);
-        return;
-      }
+      if (!butlers) { setAllocations([]); setLoading(false); return; }
 
       const { data: tasks } = await getSupabase()
-        .from('tasks')
-        .select('*')
+        .from('tasks').select('*')
         .gte('created_at', `${date}T00:00:00`)
         .lt('created_at', `${date}T23:59:59`);
 
       const { data: delights } = await getSupabase()
-        .from('guest_delights')
-        .select('*')
-        .gte('created_at', `${date}T00:00:00`)
-        .lt('created_at', `${date}T23:59:59`);
+        .from('guest_delights').select('*')
+        .eq('booking_date', date);
 
       const allocMap: Record<string, ButlerAllocation> = {};
-
-      butlers.forEach(butler => {
-        const butlerTasks = tasks?.filter(t => t.butler_id === butler.id) || [];
-        const butlerDelights = delights?.filter(d => d.butler_id === butler.id) || [];
-
-        const breakdown: Record<string, number> = {
-          'Arrival selfie': 0,
-          'Guest welcome': 0,
-          'Table layout': 0,
-          'Exit selfie': 0,
-        };
-
-        butlerTasks.forEach(t => {
-          if (t.type in breakdown) breakdown[t.type]++;
-        });
-
-        const completed = butlerTasks.filter(t => t.status === 'completed').length;
-        const delayed = butlerTasks.filter(t => t.status === 'delayed').length;
-
+      butlers.forEach((butler: any) => {
+        const butlerTasks = tasks?.filter((t: any) => t.butler_id === butler.id) || [];
+        const butlerDelights = delights?.filter((d: any) => d.your_name === butler.name) || [];
+        const breakdown: Record<string, number> = { 'Arrival selfie': 0, 'Guest welcome': 0, 'Table layout': 0, 'Exit selfie': 0 };
+        butlerTasks.forEach((t: any) => { if (t.type in breakdown) breakdown[t.type]++; });
+        const completed = butlerTasks.filter((t: any) => t.status === 'completed').length;
+        const delayed = butlerTasks.filter((t: any) => t.status === 'delayed').length;
         allocMap[butler.id] = {
           id: butler.id,
           name: butler.name || 'Unknown',
@@ -92,132 +381,148 @@ export default function AllocationPage() {
           tasks: butlerTasks,
         };
       });
-
       setAllocations(Object.values(allocMap));
-    } catch (err) {
-      console.error('Load error:', err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error('Load error:', err); }
+    finally { setLoading(false); }
   };
 
-  const taskEmojis: Record<string, string> = {
-    'Arrival selfie': '📱',
-    'Guest welcome': '🙏',
-    'Table layout': '🍽',
-    'Exit selfie': '👋',
-  };
-
-  if (user?.role === 'butler') {
-    return (
-      <Topbar title="Allocation" subtitle="You don't have access to this page" actions={null} />
-    );
-  }
+  const squads = ['All', 'Lonavala', 'Alibaug', 'Karjat', 'Nashik', 'Pune'];
 
   return (
     <>
+      {assigningButler && (
+        <AssignTaskModal
+          butler={assigningButler}
+          date={date}
+          properties={properties}
+          onClose={() => setAssigningButler(null)}
+          onSaved={() => { setAssigningButler(null); loadAllocations(); }}
+        />
+      )}
+
       <Topbar
-        title="Daily Allocation"
-        subtitle="Track what butlers are doing today"
+        title="Daily allocation"
+        subtitle="Track what every butler is doing today"
         actions={null}
       />
+
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
 
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', marginBottom: 4 }}>Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="sv-select" style={{ width: 140 }} />
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="sv-select" style={{ width: 148 }} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', marginBottom: 4 }}>Squad</label>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Squad</label>
             <select value={squad} onChange={e => setSquad(e.target.value)} className="sv-select" style={{ width: 140 }}>
-              <option>All</option>
-              <option>Lonavala</option>
-              <option>Alibaug</option>
-              <option>Karjat</option>
-              <option>Nashik</option>
+              {squads.map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
+          <button className="sv-btn" style={{ fontSize: 12 }} onClick={loadAllocations}>↻ Refresh</button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
-          <div className="metric-card blue">
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Total butlers</div>
-            <div style={{ fontSize: 32, fontWeight: 700 }}>{allocations.length}</div>
-          </div>
-          <div className="metric-card green">
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>On track</div>
-            <div style={{ fontSize: 32, fontWeight: 700 }}>{allocations.filter(a => a.status === 'on_track').length}</div>
-          </div>
-          <div className="metric-card coral">
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Delayed</div>
-            <div style={{ fontSize: 32, fontWeight: 700 }}>{allocations.filter(a => a.status === 'delayed').length}</div>
-          </div>
-          <div className="metric-card peach">
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Tasks assigned</div>
-            <div style={{ fontSize: 32, fontWeight: 700 }}>{allocations.reduce((a, b) => a + b.totalTasks, 0)}</div>
-          </div>
+        {/* Summary metrics */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 12, marginBottom: 24 }}>
+          {[
+            { label: 'Total butlers', value: allocations.length, cls: 'blue' },
+            { label: 'On track', value: allocations.filter(a => a.status === 'on_track').length, cls: 'green' },
+            { label: 'Delayed', value: allocations.filter(a => a.status === 'delayed').length, cls: 'coral' },
+            { label: 'Unassigned', value: allocations.filter(a => a.status === 'unassigned').length, cls: 'peach' },
+            { label: 'Total tasks', value: allocations.reduce((s, a) => s + a.totalTasks, 0), cls: 'blue' },
+            { label: 'Delights logged', value: allocations.reduce((s, a) => s + a.delightCount, 0), cls: 'green' },
+          ].map(m => (
+            <div key={m.label} className={`metric-card ${m.cls}`}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{m.label}</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }}>{loading ? '…' : m.value}</div>
+            </div>
+          ))}
         </div>
 
+        {/* Butler Utilization — admin/supervisor only */}
+        {isSuper && !loading && <UtilizationPanel allocations={allocations} />}
+
+        {/* Allocation table */}
         <div className="sv-card">
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Butler allocation — {date}</div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="sv-table" style={{ width: '100%', minWidth: 700 }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left' }}>Butler</th>
-                  <th style={{ textAlign: 'left' }}>Squad</th>
-                  <th style={{ textAlign: 'left' }}>Progress</th>
-                  <th style={{ textAlign: 'left' }}>Tasks</th>
-                  <th style={{ textAlign: 'left' }}>Delights</th>
-                  <th style={{ textAlign: 'left' }}>Status</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allocations.map(alloc => (
-                  <tr key={alloc.id} onClick={() => setExpandedButler(expandedButler === alloc.id ? null : alloc.id)} style={{ cursor: 'pointer' }}>
-                    <td style={{ fontWeight: 500 }}>{alloc.name}</td>
-                    <td style={{ color: 'var(--muted-fg)' }}>{alloc.squad}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div className="progress-track" style={{ width: 80 }}>
-                          <div className="progress-fill fill-blue" style={{ width: `${alloc.totalTasks > 0 ? (alloc.completedTasks / alloc.totalTasks) * 100 : 0}%` }} />
-                        </div>
-                        <span style={{ fontSize: 12, fontWeight: 600 }}>{alloc.completedTasks}/{alloc.totalTasks}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        {Object.entries(alloc.taskBreakdown).map(([type, count]) => (
-                          count > 0 && <span key={type} title={type} style={{ fontSize: 16, opacity: 1 }}>{taskEmojis[type]}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>{alloc.delightCount}</td>
-                    <td>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4,
-                        background: alloc.status === 'delayed' ? 'rgba(233,160,167,0.15)' : alloc.status === 'on_track' ? 'rgba(151,196,89,0.15)' : 'rgba(156,204,252,0.12)',
-                        color: alloc.status === 'delayed' ? '#E9A0A7' : alloc.status === 'on_track' ? '#97C459' : '#9CCCFC'
-                      }}>
-                        {alloc.status === 'delayed' ? '⚠ Delayed' : alloc.status === 'on_track' ? '✓ On track' : '— Unassigned'}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }}>
-                        {expandedButler === alloc.id ? '▼' : '▶'}
-                      </button>
-                    </td>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Butler allocation — {new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginBottom: 14 }}>Click a row to expand · Assign tasks from the row actions</div>
+
+          {loading ? (
+            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--muted-fg)' }}>Loading…</div>
+          ) : allocations.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted-fg)' }}>No butlers found for the selected filters.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="sv-table" style={{ width: '100%', minWidth: 720 }}>
+                <thead>
+                  <tr>
+                    <th>Butler</th>
+                    <th>Squad</th>
+                    <th>Progress</th>
+                    <th>Task types</th>
+                    <th>Delights</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'center' }}>Assign</th>
+                    <th style={{ textAlign: 'center' }}>Detail</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {allocations.length === 0 && (
-            <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted-fg)' }}>
-              No butlers found for the selected filters
+                </thead>
+                <tbody>
+                  {allocations.map(alloc => (
+                    <>
+                      <tr key={alloc.id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div className="sv-avatar">{alloc.name.slice(0,2).toUpperCase()}</div>
+                            <span style={{ fontWeight: 500 }}>{alloc.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--muted-fg)' }}>{alloc.squad}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div className="progress-track" style={{ width: 72 }}>
+                              <div className="progress-fill fill-blue" style={{ width: `${alloc.totalTasks > 0 ? (alloc.completedTasks / alloc.totalTasks) * 100 : 0}%` }} />
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 600 }}>{alloc.completedTasks}/{alloc.totalTasks}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {Object.entries(alloc.taskBreakdown).map(([type, count]) =>
+                              count > 0 && (
+                                <span key={type} title={`${type} (${count})`} style={{ fontSize: 17 }}>{TASK_EMOJIS[type]}</span>
+                              )
+                            )}
+                            {alloc.totalTasks === 0 && <span style={{ fontSize: 12, color: 'var(--muted-fg)' }}>None</span>}
+                          </div>
+                        </td>
+                        <td style={{ fontWeight: alloc.delightCount > 0 ? 600 : 400, color: alloc.delightCount > 0 ? '#2D5A0E' : 'var(--muted-fg)' }}>
+                          {alloc.delightCount}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4, background: alloc.status === 'delayed' ? 'rgba(233,160,167,0.15)' : alloc.status === 'on_track' ? 'rgba(151,196,89,0.15)' : 'rgba(156,204,252,0.12)', color: alloc.status === 'delayed' ? '#E9A0A7' : alloc.status === 'on_track' ? '#97C459' : '#9CCCFC' }}>
+                            {alloc.status === 'delayed' ? '⚠ Delayed' : alloc.status === 'on_track' ? '✓ On track' : '— Unassigned'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setAssigningButler(alloc)}>
+                            Assign task
+                          </button>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setExpandedButler(expandedButler === alloc.id ? null : alloc.id)}>
+                            {expandedButler === alloc.id ? '▼' : '▶'}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedButler === alloc.id && (
+                        <ButlerDetailRow alloc={alloc} onAssign={() => setAssigningButler(alloc)} />
+                      )}
+                    </>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

@@ -70,15 +70,18 @@ export default function TasksPage() {
               <table className="sv-table">
                 <thead><tr><th>Task</th><th>Butler</th><th>Property</th><th>Due</th><th>Status</th></tr></thead>
                 <tbody>
-                  {filtered.map(t => (
+                  {filtered.map(t => {
+                    const tAny = t as any;
+                    return (
                     <tr key={t.id}>
                       <td style={{ fontWeight: 500 }}>{t.type}</td>
-                      <td style={{ color: 'var(--muted-fg)' }}>{(t.profiles as any)?.name ?? '—'}</td>
-                      <td style={{ color: 'var(--muted-fg)' }}>{(t.properties as any)?.name ?? '—'}</td>
+                      <td style={{ color: 'var(--muted-fg)' }}>{tAny.profiles?.name ?? '—'}</td>
+                      <td style={{ color: 'var(--muted-fg)' }}>{tAny.properties?.name ?? '—'}</td>
                       <td style={{ color: 'var(--muted-fg)' }}>{t.due_time ?? '—'}</td>
                       <td><span className={getStatusBadge(t.status)}>{getStatusLabel(t.status)}</span></td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

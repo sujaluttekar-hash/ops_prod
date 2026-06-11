@@ -5,7 +5,12 @@ import { insertSubmission, uploadTaskPhoto, getSupabase } from '@/lib/supabase';
 import { getCurrentUser, type AppUser } from '@/lib/auth';
 
 const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie'] as const;
-const TASK_EMOJI: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋' };
+const TASK_EMOJI: Record<string,string> = {
+  'Arrival selfie': '🤳',
+  'Guest welcome': '🙏',
+  'Table layout': '🍽',
+  'Exit selfie': '👋',
+};
 
 export default function SubmitPage() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -19,11 +24,12 @@ export default function SubmitPage() {
 
   useEffect(() => {
     getCurrentUser().then(setUser);
-    getSupabase().from('properties').select('id, name').order('name').then(({ data }) => setProperties(data ?? []));
+    getSupabase().from('properties').select('id, name').order('name').then((res: any) => setProperties(res.data ?? []));
   }, []);
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => setPhoto({ file, preview: ev.target?.result as string });
     reader.readAsDataURL(file);
@@ -48,9 +54,13 @@ export default function SubmitPage() {
         photo_url,
         status: 'pending',
       });
-      if (err) throw new Error(err.message);
+      if (err) throw new Error((err as any).message);
       setSaved(true);
-      setTimeout(() => { setSaved(false); setForm({ task_type: '', property: '', notes: '' }); setPhoto(null); }, 2000);
+      setTimeout(() => {
+        setSaved(false);
+        setForm({ task_type: '', property: '', notes: '' });
+        setPhoto(null);
+      }, 2200);
     } catch (err: any) { setError(err.message); } finally { setSaving(false); }
   }
 
@@ -69,7 +79,11 @@ export default function SubmitPage() {
           <div style={{ maxWidth: 520, margin: '0 auto' }}>
             <div className="sv-card">
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 20 }}>Task details</div>
-              {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
+              {error && (
+                <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>
+                  ⚠ {error}
+                </div>
+              )}
               <form onSubmit={handleSubmit}>
                 {/* Task type */}
                 <div style={{ marginBottom: 16 }}>
