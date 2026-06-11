@@ -254,16 +254,28 @@ export default function DelightPage() {
   }
 
   useEffect(() => {
-    const stored = localStorage.getItem('sv_profile');
-    if (stored) { try { setUser(JSON.parse(stored)); } catch {} }
-    load();
+    let currentUser = null;
+    try {
+      const stored = localStorage.getItem('sv_local_session');
+      if (stored) { currentUser = JSON.parse(stored); setUser(currentUser); }
+    } catch {}
+    // Pass user directly to load so filter works on first render
+    const fetchData = async () => {
+      const data = await (await import('@/lib/supabase')).fetchGuestDelights();
+      if (currentUser && currentUser.role === 'butler') {
+        setEntries(data.filter((e: any) => e.your_name === currentUser.name));
+      } else {
+        setEntries(data);
+      }
+      setLoading(false);
+    };
+    fetchData();
   }, []);
 
+  // Realtime polling every 30s (replaces broken Supabase realtime subscription)
   useEffect(() => {
-    const channel = getSupabase().channel('delight_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'guest_delights' }, load)
-      .subscribe();
-    return () => { getSupabase().removeChannel(channel); };
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const isAdminOrSupervisor = user && isSupervisor(user.role);

@@ -283,7 +283,7 @@ function LeaderboardModal({ quiz, onClose }: { quiz: QuizWithTraining; onClose: 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getSupabase()
+    getServiceSupabase()
       .from('quiz_attempts')
       .select('*, profiles(name, squad)')
       .eq('quiz_id', quiz.id)
@@ -358,7 +358,7 @@ export default function QuizPage() {
   }
 
   useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('sv_profile') : null;
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('sv_local_session') : null;
     if (stored) { try { setUser(JSON.parse(stored)); } catch {} }
     load();
   }, []);

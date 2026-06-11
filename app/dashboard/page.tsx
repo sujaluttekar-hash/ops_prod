@@ -48,7 +48,7 @@ export default function DashboardPage() {
       <Topbar
         title={user?.role === 'butler' ? `Welcome, ${user?.name || 'Butler'} 👋` : 'Operations dashboard'}
         subtitle={today}
-        actions={<button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }}>+ New task</button>}
+        actions={<a href="/allocation" style={{ textDecoration: 'none' }}><button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }}>+ Assign task</button></a>}
       />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />

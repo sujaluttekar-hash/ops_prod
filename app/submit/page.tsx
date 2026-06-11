@@ -23,7 +23,11 @@ export default function SubmitPage() {
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    getCurrentUser().then(setUser);
+    // Read from localStorage (local session auth)
+    try {
+      const stored = localStorage.getItem('sv_local_session');
+      if (stored) setUser(JSON.parse(stored) as any);
+    } catch {}
     getServiceSupabase().from('properties').select('id, name').order('name').then((res: any) => setProperties(res.data ?? []));
   }, []);
 

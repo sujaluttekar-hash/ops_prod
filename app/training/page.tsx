@@ -227,7 +227,7 @@ export default function TrainingPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (user !== undefined) load(); }, [user]);
 
   const completed = trainings.filter(t => t.status === 'completed').length;
 
