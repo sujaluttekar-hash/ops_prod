@@ -113,7 +113,7 @@ function NotificationBell({ userId }: { userId: string }) {
             : notifs.map((n: any) => (
               <div key={n.id} style={{ padding: '10px 14px', borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 2 }}>{n.title}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{n.message}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{n.body || n.message}</div>
               </div>
             ))}
         </div>

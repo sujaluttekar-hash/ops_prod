@@ -157,8 +157,8 @@ function AssignTaskModal({
         const notifRes = await getServiceSupabase().from('notifications').insert({
           user_id: butler.id,
           title: 'New task assigned',
-          message: `You have been assigned: ${form.task_type || form.booking_type}${form.property_id ? ' at ' + form.property_id : ''}${form.due_time ? ' · Due ' + form.due_time : ''}`,
-          type: 'info',
+          body: `You have been assigned: ${form.task_type || form.booking_type}${form.property_id ? ' at ' + form.property_id : ''}${form.due_time ? ' · Due ' + form.due_time : ''}`,
+          type: 'task',
           read: false,
         });
         if (notifRes.error) console.warn('Notification insert failed:', notifRes.error.message, notifRes.error.code);
@@ -279,8 +279,8 @@ function ButlerDetailRow({ alloc, onAssign }: { alloc: ButlerAllocation; onAssig
                   const nr = await getServiceSupabase().from('notifications').insert({
                     user_id: alloc.id,
                     title: 'New task assigned',
-                    message: `You have been assigned: ${bt}`,
-                    type: 'info',
+                    body: `You have been assigned: ${bt}`,
+                    type: 'task',
                     read: false,
                   });
                   if (nr.error) console.warn('Notification failed:', nr.error.message, nr.error.code);

@@ -68,8 +68,8 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
           butlers.map((b: any) => ({
             user_id: b.id,
             title: `Huddle scheduled: ${form.team}`,
-            message: `Scheduled for ${new Date(form.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${form.time ? ' at ' + form.time.slice(0,5) : ''}${addQuiz ? ' · Quiz included' : ''}`,
-            type: 'info',
+            body: `Scheduled for ${new Date(form.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${form.time ? ' at ' + form.time.slice(0,5) : ''}${addQuiz ? ' · Quiz included' : ''}`,
+            type: 'huddle',
             read: false,
           }))
         ).then(() => {}).catch(() => {});
