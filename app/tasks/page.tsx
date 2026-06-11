@@ -10,7 +10,7 @@ const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie
 const taskEmoji: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋' };
 
 // ── Complete Task Modal ────────────────────────────────────────
-function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () => void; onDone: () => void }) {
+function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () => void; onDone: (taskId: string) => void }) {
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -32,15 +32,23 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
       if (photo) {
         photo_url = await uploadTaskPhoto(photo.file, task.id);
       }
-      await getServiceSupabase().from('tasks').update({
+      const { error } = await getServiceSupabase().from('tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         notes: notes || task.notes || null,
         photo_path: photo_url || task.photo_path || null,
       }).eq('id', task.id);
+
+      if (error) {
+        alert('Failed to save: ' + error.message);
+        setSaving(false);
+        return;
+      }
+
       setDone(true);
-      setTimeout(() => { onDone(); onClose(); }, 900);
+      onDone(task.id); // update parent state immediately
+      setTimeout(() => { onClose(); }, 1200);
     } catch (e: any) {
       alert('Error: ' + e.message);
       setSaving(false);
@@ -130,10 +138,22 @@ export default function TasksPage() {
 
   async function load() {
     const sb = getServiceSupabase();
-    let q = sb.from('tasks').select('*, profiles(name)').order('created_at', { ascending: false });
-    if (user && !isSuper) q = q.eq('butler_id', user.id);
-    const { data } = await q;
-    setTasks((data || []) as any);
+    if (user && !isSuper) {
+      // Fetch tasks matching this butler's ID
+      const { data } = await sb
+        .from('tasks')
+        .select('*, profiles(name)')
+        .eq('butler_id', user.id)
+        .order('created_at', { ascending: false });
+      setTasks((data || []) as any);
+    } else {
+      // Admin/supervisor sees all
+      const { data } = await sb
+        .from('tasks')
+        .select('*, profiles(name)')
+        .order('created_at', { ascending: false });
+      setTasks((data || []) as any);
+    }
     setLoading(false);
   }
 
@@ -152,7 +172,13 @@ export default function TasksPage() {
 
   return (
     <>
-      {completeTask && <CompleteTaskModal task={completeTask} onClose={() => setCompleteTask(null)} onDone={load} />}
+      {completeTask && <CompleteTaskModal task={completeTask} onClose={() => setCompleteTask(null)} onDone={(taskId) => {
+        // Immediately update local state so UI reflects completion
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'completed' as any } : t));
+        setCompleteTask(null);
+        // Also re-fetch from Supabase after a short delay
+        setTimeout(load, 1000);
+      }} />}
       <Topbar title={isSuper ? 'Utilisation tasks' : 'My tasks'} subtitle={isSuper ? 'Daily butler task tracking' : 'Tasks assigned to you'}
         actions={<button className="sv-btn" style={{ fontSize: 12 }} onClick={load}>↻ Refresh</button>} />
       <div style={{ padding: 24 }} className="page-enter">
