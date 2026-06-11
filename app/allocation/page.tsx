@@ -83,21 +83,24 @@ function AssignTaskModal({
         created_at: `${date}T${form.due_time || '08:00'}:00`,
       };
 
-      // Store butler info in notes for fallback matching
+      // ALWAYS store butler name in notes for reliable matching
+      // butler_id may be null due to FK constraint — name is the fallback identifier
       const fullNotes = [
         `Butler: ${butler.name}`,
+        `ButlerID: ${butler.id}`,
         notesText || '',
       ].filter(Boolean).join(' · ');
 
-      const { error: err1 } = await getServiceSupabase().from('tasks').insert({
+      // First try with butler_id
+      const { error: err1, data: insertedTask } = await getServiceSupabase().from('tasks').insert({
         ...taskPayload,
         butler_id: butler.id,
-        notes: notesText || null,
-      });
+        notes: fullNotes,
+      }).select().single();
 
       if (err1) {
-        // FK violation — insert without butler_id, store name in notes
-        console.warn('butler_id FK failed, inserting without FK:', err1.message);
+        // FK failed — insert without butler_id
+        console.warn('butler_id FK failed:', err1.message);
         const { error: err2 } = await getServiceSupabase().from('tasks').insert({
           ...taskPayload,
           butler_id: null,

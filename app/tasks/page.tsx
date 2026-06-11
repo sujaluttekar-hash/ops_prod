@@ -151,18 +151,20 @@ export default function TasksPage() {
   async function load() {
     const sb = getServiceSupabase();
     if (user && !isSuper) {
-      // Try by butler_id UUID first, then fallback to name match in notes
-      const [byId, byName] = await Promise.all([
+      // Three-way match: by butler_id UUID, or ButlerID in notes, or Butler name in notes
+      const [byId, byNoteId, byName] = await Promise.all([
         sb.from('tasks').select('*, profiles(name)')
           .eq('butler_id', user.id)
           .order('created_at', { ascending: false }),
         sb.from('tasks').select('*, profiles(name)')
-          .is('butler_id', null)
+          .ilike('notes', `%ButlerID: ${user.id}%`)
+          .order('created_at', { ascending: false }),
+        sb.from('tasks').select('*, profiles(name)')
           .ilike('notes', `%Butler: ${user.name}%`)
           .order('created_at', { ascending: false }),
       ]);
-      // Merge and deduplicate
-      const all = [...(byId.data || []), ...(byName.data || [])];
+      // Merge and deduplicate by ID
+      const all = [...(byId.data || []), ...(byNoteId.data || []), ...(byName.data || [])];
       const seen = new Set<string>();
       const unique = all.filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
       setTasks(unique as any);
