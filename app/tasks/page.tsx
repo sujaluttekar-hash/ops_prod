@@ -148,26 +148,22 @@ export default function TasksPage() {
 
   const isSuper = user ? isSupervisor(user.role as any) : false;
 
-  async function load(currentUser = user) {
-    if (!currentUser) return;
+  async function loadForUser(u: { id: string; name: string; role: string }) {
     const sb = getServiceSupabase();
-    const supervisor = isSupervisor(currentUser.role as any);
-
+    const supervisor = isSupervisor(u.role as any);
     if (!supervisor) {
-      // Butler: fetch ALL tasks, filter client-side by butler_id or notes
       const { data: allTasks } = await sb
         .from('tasks').select('*, profiles(name)')
         .order('created_at', { ascending: false });
       if (allTasks) {
         const mine = allTasks.filter((t: any) =>
-          t.butler_id === currentUser.id ||
-          t.notes?.includes(`ButlerID: ${currentUser.id}`) ||
-          t.notes?.includes(`Butler: ${currentUser.name}`)
+          t.butler_id === u.id ||
+          (t.notes && t.notes.includes('ButlerID: ' + u.id)) ||
+          (t.notes && t.notes.includes('Butler: ' + u.name))
         );
         setTasks(mine as any);
       }
     } else {
-      // Admin/supervisor: all tasks
       const { data } = await sb
         .from('tasks').select('*, profiles(name)')
         .order('created_at', { ascending: false });
@@ -176,24 +172,25 @@ export default function TasksPage() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    // Read user directly from localStorage to avoid stale closure
-    const stored = localStorage.getItem('sv_local_session');
-    if (stored) {
-      try {
-        const localUser = JSON.parse(stored);
-        load(localUser);
-      } catch {}
-    }
-  }, []);
+  function load() {
+    // Always read fresh from localStorage — never use stale closure
+    try {
+      const stored = localStorage.getItem('sv_local_session');
+      if (stored) { loadForUser(JSON.parse(stored)); }
+    } catch {}
+  }
 
-  useEffect(() => { if (user) load(user); }, [user]);
+  // Run on mount immediately
+  useEffect(() => { load(); }, []);
+
+  // Also run when auth context user changes
+  useEffect(() => { if (user) loadForUser(user as any); }, [user?.id]);
 
   // Poll every 15s
   useEffect(() => {
-    const t = setInterval(() => { if (user) load(user); }, 15000);
+    const t = setInterval(() => load(), 15000);
     return () => clearInterval(t);
-  }, [user]);
+  }, []);
 
   const filtered = tasks.filter(t => filter === 'All' || t.status === filter);
   const done = tasks.filter(t => t.status === 'completed').length;
