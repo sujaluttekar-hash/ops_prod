@@ -142,7 +142,16 @@ function AssignTaskModal({
                     <span style={{ fontSize: 18 }}>{TASK_EMOJIS[tt]}</span> {tt}
                   </button>
                 ))}
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, task_type: f.task_type === 'Custom task' ? '' : 'Custom task' }))}
+                  style={{ padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${form.task_type === 'Custom task' ? '#9CCCFC' : 'rgba(0,0,0,0.1)'}`, background: form.task_type === 'Custom task' ? 'rgba(156,204,252,0.1)' : 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: form.task_type === 'Custom task' ? 600 : 400, transition: 'all 0.12s' }}>
+                  <span style={{ fontSize: 18 }}>✏️</span> Custom task
+                </button>
               </div>
+              {form.task_type === 'Custom task' && (
+                <input className="sv-input" style={{ width: '100%', marginTop: 8 }} placeholder="Describe the task…"
+                  value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+              )}
             </div>
 
             {/* Property */}

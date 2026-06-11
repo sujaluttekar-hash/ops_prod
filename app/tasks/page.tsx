@@ -6,8 +6,8 @@ import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
 
-const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie'];
-const taskEmoji: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋' };
+const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Custom task'];
+const taskEmoji: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋','Custom task':'✏️' };
 
 // ── Complete Task Modal ────────────────────────────────────────
 function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () => void; onDone: (taskId: string) => void }) {
@@ -35,8 +35,7 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
       const { error } = await getServiceSupabase().from('tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        notes: notes || task.notes || null,
+        notes: [isCustom && customTaskName ? `Task: ${customTaskName}` : '', notes || task.notes || ''].filter(Boolean).join(' · ') || null,
         photo_path: photo_url || task.photo_path || null,
       }).eq('id', task.id);
 
@@ -55,7 +54,9 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
     }
   }
 
+  const [customTaskName, setCustomTaskName] = useState('');
   const villaName = task.notes?.replace('Villa: ', '').split(' · ')[0] || task.property_id || '—';
+  const isCustom = task.type === 'Custom task';
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
@@ -78,6 +79,17 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
               <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
             </div>
             <div className="sv-strip" style={{ marginBottom: 18 }} />
+            {/* Custom task name input */}
+            {isCustom && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Task name *</div>
+                <input
+                  value={customTaskName} onChange={e => setCustomTaskName(e.target.value)}
+                  placeholder="Describe what you did…"
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, fontSize: 14, boxSizing: 'border-box', outline: 'none' }}
+                />
+              </div>
+            )}
 
             {/* Photo upload */}
             <div style={{ marginBottom: 16 }}>
@@ -116,7 +128,7 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
             {/* Actions */}
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" className="sv-btn" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
-              <button type="button" className="sv-btn sv-btn-primary" onClick={handleSubmit} disabled={saving} style={{ flex: 2 }}>
+              <button type="button" className="sv-btn sv-btn-primary" onClick={handleSubmit} disabled={saving || (isCustom && !customTaskName.trim())} style={{ flex: 2 }}>
                 {saving ? 'Submitting…' : '✓ Submit & complete'}
               </button>
             </div>
