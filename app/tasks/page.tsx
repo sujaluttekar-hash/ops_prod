@@ -151,23 +151,22 @@ export default function TasksPage() {
   async function load() {
     const sb = getServiceSupabase();
     if (user && !isSuper) {
-      // Three-way match: by butler_id UUID, or ButlerID in notes, or Butler name in notes
-      const [byId, byNoteId, byName] = await Promise.all([
-        sb.from('tasks').select('*, profiles(name)')
-          .eq('butler_id', user.id)
-          .order('created_at', { ascending: false }),
-        sb.from('tasks').select('*, profiles(name)')
-          .ilike('notes', `%ButlerID: ${user.id}%`)
-          .order('created_at', { ascending: false }),
-        sb.from('tasks').select('*, profiles(name)')
-          .ilike('notes', `%Butler: ${user.name}%`)
-          .order('created_at', { ascending: false }),
-      ]);
-      // Merge and deduplicate by ID
-      const all = [...(byId.data || []), ...(byNoteId.data || []), ...(byName.data || [])];
-      const seen = new Set<string>();
-      const unique = all.filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
-      setTasks(unique as any);
+      console.log('[Tasks] Loading for user:', user.id, user.name, user.role);
+      // Fetch ALL tasks then filter client-side to handle any ID/name mismatch
+      const { data: allTasks, error } = await sb
+        .from('tasks').select('*, profiles(name)')
+        .order('created_at', { ascending: false });
+      console.log('[Tasks] All tasks count:', allTasks?.length, 'error:', error?.message);
+      if (allTasks) {
+        const mine = allTasks.filter((t: any) => {
+          const matchId = t.butler_id === user.id;
+          const matchNoteId = t.notes?.includes(`ButlerID: ${user.id}`);
+          const matchName = t.notes?.includes(`Butler: ${user.name}`);
+          return matchId || matchNoteId || matchName;
+        });
+        console.log('[Tasks] My tasks:', mine.length);
+        setTasks(mine as any);
+      }
     } else {
       const { data } = await sb
         .from('tasks').select('*, profiles(name)')
