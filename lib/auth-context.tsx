@@ -28,18 +28,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Hard timeout — if auth takes more than 4s, unblock the UI
+    const timeout = setTimeout(() => {
+      setLoading(false)
+    }, 4000)
+
     const loadUser = async () => {
       try {
         const sb = getSupabase()
         const { data: { session } } = await sb.auth.getSession()
-        
+
         if (!session?.user?.id) {
           setUser(null)
           setLoading(false)
+          clearTimeout(timeout)
           return
         }
 
-        // Fetch profile by auth ID
         const { data: profile } = await sb
           .from('profiles')
           .select('*')
@@ -48,43 +53,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (profile) {
           setUser(profile as Profile)
-        } else {
-          // Fallback to email lookup
+        } else if (session.user.email) {
           const { data: profileByEmail } = await sb
             .from('profiles')
             .select('*')
             .eq('email', session.user.email)
             .single()
-          setUser(profileByEmail as Profile || null)
+          setUser((profileByEmail as Profile) || null)
         }
       } catch (err) {
         console.error('Auth load error:', err)
         setUser(null)
       } finally {
         setLoading(false)
+        clearTimeout(timeout)
       }
     }
 
     loadUser()
 
-    // Listen for auth changes
     const sb = getSupabase()
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event: any, session: any) => {
       if (!session?.user?.id) {
         setUser(null)
         return
       }
-
-      const { data: profile } = await sb
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-
-      setUser(profile as Profile || null)
+      try {
+        const { data: profile } = await sb
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        setUser((profile as Profile) || null)
+      } catch {
+        setUser(null)
+      }
     })
 
-    return () => subscription?.unsubscribe()
+    return () => {
+      subscription?.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [])
 
   const signOut = async () => {
