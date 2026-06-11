@@ -279,7 +279,7 @@ function AttendanceModal({ huddle, profiles, onClose, onSaved }: { huddle: Huddl
               {butlers.map(p => (
                 <div key={p.id} onClick={() => toggle(p.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${attended.has(p.id) ? '#97C459' : 'rgba(0,0,0,0.1)'}`, background: attended.has(p.id) ? 'rgba(151,196,89,0.08)' : 'white', cursor: 'pointer', transition: 'all 0.15s' }}>
-                  <div className="sv-avatar">{p.name.slice(0,2).toUpperCase()}</div>
+                  <div className="sv-avatar">{(p.name || "??").slice(0,2).toUpperCase()}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--muted-fg)' }}>{p.squad ?? '—'}</div>
@@ -520,14 +520,14 @@ export default function HuddlePage() {
                 <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Overall butler attendance</div>
                 {loading ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>Loading…</div> :
                   butlers.length === 0 ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>No butlers yet.</div> :
-                  butlers.map(async_p => {
+                  butlers.map(p => {
                     const totalCompleted = completed.length;
                     return (
-                      <div key={async_p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
-                        <div className="sv-avatar">{async_p.name.slice(0,2).toUpperCase()}</div>
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
+                        <div className="sv-avatar">{(p.name || "??").slice(0,2).toUpperCase()}</div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500 }}>{async_p.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 1 }}>{async_p.squad ?? '—'}</div>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 1 }}>{p.squad ?? '—'}</div>
                         </div>
                         {totalCompleted > 0 && <span className="badge badge-blue">{totalCompleted} huddle{totalCompleted !== 1 ? 's' : ''}</span>}
                       </div>

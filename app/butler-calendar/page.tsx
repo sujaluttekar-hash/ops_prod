@@ -192,9 +192,9 @@ export default function ButlerCalendarPage() {
         <div className="sv-card" style={{ padding: 20 }}>
           {selectedButler && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <div className="sv-avatar">{selectedButler.name.slice(0,2).toUpperCase()}</div>
+              <div className="sv-avatar">{(selectedButler.name || '??').slice(0,2).toUpperCase()}</div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{selectedButler.name}</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{selectedButler.name || '—'}</div>
                 <div style={{ fontSize: 12, color: 'var(--muted-fg)' }}>{selectedButler.squad ?? '—'} · {selectedButler.role}</div>
               </div>
             </div>

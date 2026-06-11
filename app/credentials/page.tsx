@@ -49,24 +49,24 @@ export default function CredentialsPage() {
             {loading ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>Loading…</div> :
               credentials.length === 0 ? <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>No credentials stored yet.</div> :
               credentials.map(cred => (
-                <div key={cred.id} className="cred-row">
+                <div key={(cred as any).id} className="cred-row">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: typeBg[cred.type] || 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-                      {typeIcon[cred.type] || '🔑'}
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: typeBg[(cred as any).type] || 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                      {typeIcon[(cred as any).type] || '🔑'}
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{cred.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{cred.property} · Expires {cred.expiry ?? 'No expiry'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{(cred as any).name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{(cred as any).property} · Expires {(cred as any).expiry ?? 'No expiry'}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{visible[cred.id] ? cred.value : '••••••••'}</span>
-                    <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setVisible(v => ({ ...v, [cred.id]: !v[cred.id] }))}>
-                      {visible[cred.id] ? '🙈' : '👁'}
+                    <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{visible[(cred as any).id] ? (cred as any).value : '••••••••'}</span>
+                    <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setVisible(v => ({ ...v, [(cred as any).id]: !v[(cred as any).id] }))}>
+                      {visible[(cred as any).id] ? '🙈' : '👁'}
                     </button>
-                    <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px', background: copied === cred.id ? '#97C459' : undefined, color: copied === cred.id ? '#2D5A0E' : undefined }}
-                      onClick={() => handleCopy(cred.id, cred.value)}>
-                      {copied === cred.id ? '✓' : '⎘'}
+                    <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px', background: copied === (cred as any).id ? '#97C459' : undefined, color: copied === (cred as any).id ? '#2D5A0E' : undefined }}
+                      onClick={() => handleCopy((cred as any).id, (cred as any).value)}>
+                      {copied === (cred as any).id ? '✓' : '⎘'}
                     </button>
                   </div>
                 </div>

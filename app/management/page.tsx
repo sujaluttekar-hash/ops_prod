@@ -136,7 +136,7 @@ export default function ManagementPage() {
                       <tr key={p.id}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div className="sv-avatar">{p.name.slice(0,2).toUpperCase()}</div>
+                            <div className="sv-avatar">{(p.name || '??').slice(0,2).toUpperCase()}</div>
                             <span style={{ fontWeight: 500 }}>{p.name}</span>
                           </div>
                         </td>

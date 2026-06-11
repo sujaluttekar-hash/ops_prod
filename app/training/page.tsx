@@ -178,7 +178,7 @@ function AttendanceModal({ training, profiles, onClose, onSaved }: { training: T
               {butlers.map(p => (
                 <div key={p.id} onClick={() => toggle(p.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${attended.has(p.id) ? '#97C459' : 'rgba(0,0,0,0.1)'}`, background: attended.has(p.id) ? 'rgba(151,196,89,0.08)' : 'white', cursor: 'pointer', transition: 'all 0.15s' }}>
-                  <div className="sv-avatar">{p.name.slice(0,2).toUpperCase()}</div>
+                  <div className="sv-avatar">{(p.name || "??").slice(0,2).toUpperCase()}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--muted-fg)' }}>{p.squad ?? '—'}</div>
@@ -373,7 +373,7 @@ export default function TrainingPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
               {profiles.map(p => (
                 <div key={p.id} style={{ background: 'var(--muted)', borderRadius: 10, padding: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className="sv-avatar">{p.name.slice(0,2).toUpperCase()}</div>
+                  <div className="sv-avatar">{(p.name || "??").slice(0,2).toUpperCase()}</div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--muted-fg)' }}>{p.squad ?? '—'} · {p.role}</div>

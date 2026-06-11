@@ -166,7 +166,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{roleLabel}</div>
             </div>
           </div>
-          <button onClick={async () => { await getSupabase().auth.signOut(); window.location.href = '/login'; }}
+          <button onClick={() => { localStorage.removeItem('sv_local_session'); window.location.replace('/login'); }}
             style={{ width: '100%', padding: '7px 0', background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 7, color: 'rgba(255,255,255,0.5)', fontSize: 12, cursor: 'pointer' }}>
             Sign out
           </button>
