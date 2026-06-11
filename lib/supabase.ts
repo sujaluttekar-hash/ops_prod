@@ -19,6 +19,18 @@ export function getSupabase() {
   return _client
 }
 
+// Service client — bypasses RLS for data fetching (read-only data like profiles)
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
+let _serviceClient: any = null
+export function getServiceSupabase() {
+  if (!_serviceClient) {
+    _serviceClient = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+  }
+  return _serviceClient
+}
+
 // ─── Hardcoded profiles (shown when Supabase is unreachable) ─────────────────
 export const LOCAL_PROFILES: Profile[] = [
   { id: 'admin@stayvista.com',           name: 'Aditi',           email: 'admin@stayvista.com',           role: 'super_admin', squad: null,       property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
@@ -107,7 +119,7 @@ export async function getUser() {
 // ─── Fetch — with local fallback ──────────────────────────────────────────────
 export async function fetchProfiles(): Promise<Profile[]> {
   try {
-    const { data, error } = await getSupabase().from('profiles').select('*').eq('is_active', true).order('name')
+    const { data, error } = await getServiceSupabase().from('profiles').select('*').eq('is_active', true).order('name')
     if (!error && data && data.length > 0) return data
   } catch {}
   return LOCAL_PROFILES
@@ -115,7 +127,7 @@ export async function fetchProfiles(): Promise<Profile[]> {
 
 export async function fetchProperties() {
   try {
-    const { data, error } = await getSupabase().from('properties').select('*').order('name')
+    const { data, error } = await getServiceSupabase().from('properties').select('*').order('name')
     if (!error && data) return data
   } catch {}
   return []
@@ -123,7 +135,7 @@ export async function fetchProperties() {
 
 export async function fetchGuestDelights(): Promise<GuestDelight[]> {
   try {
-    const { data, error } = await getSupabase().from('guest_delights').select('*, delight_photos(*)').order('created_at', { ascending: false })
+    const { data, error } = await getServiceSupabase().from('guest_delights').select('*, delight_photos(*)').order('created_at', { ascending: false })
     if (!error && data) return data
   } catch {}
   return []
@@ -131,7 +143,7 @@ export async function fetchGuestDelights(): Promise<GuestDelight[]> {
 
 export async function fetchTasks(): Promise<Task[]> {
   try {
-    const { data, error } = await getSupabase().from('tasks').select('*').order('created_at', { ascending: false })
+    const { data, error } = await getServiceSupabase().from('tasks').select('*').order('created_at', { ascending: false })
     if (!error && data) return data
   } catch {}
   return []
@@ -139,7 +151,7 @@ export async function fetchTasks(): Promise<Task[]> {
 
 export async function fetchSubmissions(): Promise<Submission[]> {
   try {
-    const { data, error } = await getSupabase().from('submissions').select('*').order('submitted_at', { ascending: false })
+    const { data, error } = await getServiceSupabase().from('submissions').select('*').order('submitted_at', { ascending: false })
     if (!error && data) return data
   } catch {}
   return []
@@ -147,7 +159,7 @@ export async function fetchSubmissions(): Promise<Submission[]> {
 
 export async function fetchHuddles(): Promise<Huddle[]> {
   try {
-    const { data, error } = await getSupabase().from('huddles').select('*').order('huddle_date', { ascending: false })
+    const { data, error } = await getServiceSupabase().from('huddles').select('*').order('huddle_date', { ascending: false })
     if (!error && data) return data
   } catch {}
   return []
@@ -155,7 +167,7 @@ export async function fetchHuddles(): Promise<Huddle[]> {
 
 export async function fetchTrainings(): Promise<Training[]> {
   try {
-    const { data, error } = await getSupabase().from('trainings').select('*').order('training_date', { ascending: false })
+    const { data, error } = await getServiceSupabase().from('trainings').select('*').order('training_date', { ascending: false })
     if (!error && data) return data
   } catch {}
   return []
@@ -163,7 +175,7 @@ export async function fetchTrainings(): Promise<Training[]> {
 
 export async function fetchCredentials(): Promise<Credential[]> {
   try {
-    const { data, error } = await getSupabase().from('credentials').select('*').order('name')
+    const { data, error } = await getServiceSupabase().from('credentials').select('*').order('name')
     if (!error && data) return data
   } catch {}
   return []
@@ -171,7 +183,7 @@ export async function fetchCredentials(): Promise<Credential[]> {
 
 export async function fetchQuizzes(): Promise<Quiz[]> {
   try {
-    const { data, error } = await getSupabase().from('quizzes').select('*, trainings(name)').eq('is_active', true).order('created_at', { ascending: false })
+    const { data, error } = await getServiceSupabase().from('quizzes').select('*, trainings(name)').eq('is_active', true).order('created_at', { ascending: false })
     if (!error && data) return data
   } catch {}
   return []
@@ -179,7 +191,7 @@ export async function fetchQuizzes(): Promise<Quiz[]> {
 
 export async function fetchQuizQuestions(quizId: string): Promise<QuizQuestion[]> {
   try {
-    const { data, error } = await getSupabase().from('quiz_questions').select('*').eq('quiz_id', quizId).order('order_no')
+    const { data, error } = await getServiceSupabase().from('quiz_questions').select('*').eq('quiz_id', quizId).order('order_no')
     if (!error && data) return data
   } catch {}
   return []
@@ -188,9 +200,9 @@ export async function fetchQuizQuestions(quizId: string): Promise<QuizQuestion[]
 export async function fetchDashboardStats() {
   try {
     const [delights, tasks, huddles] = await Promise.all([
-      getSupabase().from('guest_delights').select('id, status, created_at'),
-      getSupabase().from('tasks').select('id, status, created_at'),
-      getSupabase().from('huddles').select('id, status, huddle_date').gte('huddle_date', new Date().toISOString().split('T')[0]).order('huddle_date'),
+      getServiceSupabase().from('guest_delights').select('id, status, created_at'),
+      getServiceSupabase().from('tasks').select('id, status, created_at'),
+      getServiceSupabase().from('huddles').select('id, status, huddle_date').gte('huddle_date', new Date().toISOString().split('T')[0]).order('huddle_date'),
     ])
     return { delights: delights.data || [], tasks: tasks.data || [], upcomingHuddles: huddles.data || [] }
   } catch {}
@@ -202,10 +214,10 @@ export async function fetchButlerActivityForMonth(butlerId: string, year: number
   const endDate = `${year}-${String(month).padStart(2,'0')}-31`
   try {
     const [delights, tasks, huddles, trainings] = await Promise.all([
-      getSupabase().from('guest_delights').select('id, booking_date, status, villa_name, booking_type').eq('your_name', butlerId).gte('booking_date', startDate).lte('booking_date', endDate),
-      getSupabase().from('tasks').select('id, type, status, created_at').eq('butler_id', butlerId).gte('created_at', startDate).lte('created_at', endDate),
-      getSupabase().from('huddle_attendance').select('huddle_id, attended, huddles(team, huddle_date)').eq('butler_id', butlerId),
-      getSupabase().from('trainings').select('id, name, training_date, status').gte('training_date', startDate).lte('training_date', endDate),
+      getServiceSupabase().from('guest_delights').select('id, booking_date, status, villa_name, booking_type').eq('your_name', butlerId).gte('booking_date', startDate).lte('booking_date', endDate),
+      getServiceSupabase().from('tasks').select('id, type, status, created_at').eq('butler_id', butlerId).gte('created_at', startDate).lte('created_at', endDate),
+      getServiceSupabase().from('huddle_attendance').select('huddle_id, attended, huddles(team, huddle_date)').eq('butler_id', butlerId),
+      getServiceSupabase().from('trainings').select('id, name, training_date, status').gte('training_date', startDate).lte('training_date', endDate),
     ])
     return { delights: delights.data || [], tasks: tasks.data || [], huddleAttendance: huddles.data || [], trainings: trainings.data || [] }
   } catch {}
