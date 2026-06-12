@@ -208,44 +208,55 @@ export default function MapPage() {
     butlerMarkersRef.current = [];
     if (!showButlers) return;
 
-    const staleThreshold = Date.now() - 5 * 60 * 1000; // 5 minutes
+    // Live = updated within last 2 minutes. Offline = anything older → red pin
+    const liveThreshold = Date.now() - 2 * 60 * 1000; // 2 minutes
 
     butlerLocations.forEach(b => {
       const updatedMs = new Date(b.updated_at).getTime();
-      const isStale = updatedMs < staleThreshold;
+      const isLive = updatedMs > liveThreshold;
       const minutesAgo = Math.floor((Date.now() - updatedMs) / 60000);
-      const timeLabel = minutesAgo < 1 ? 'just now' : `${minutesAgo}m ago`;
+      const hoursAgo = Math.floor(minutesAgo / 60);
+      const timeLabel = minutesAgo < 1
+        ? 'just now'
+        : minutesAgo < 60
+          ? `${minutesAgo}m ago`
+          : `${hoursAgo}h ago`;
 
       const initials = (b.butler_name || '??').split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase();
 
+      // Green border + dot = live. Red border + no dot = offline
+      const borderColor = isLive ? '#97C459' : '#E9A0A7';
+      const bgColor = isLive ? '#1B1D1F' : '#8B2020';
+      const dotColor = isLive ? '#97C459' : '#E55353';
+
       const icon = L.divIcon({
         className: '',
-        html: `<div style="
-          position:relative;
-          width:38px;height:38px;
-        ">
+        html: `<div style="position:relative;width:38px;height:38px;">
           <div style="
             width:38px;height:38px;border-radius:50%;
-            background:${isStale ? '#aaa' : '#1B1D1F'};
-            border:3px solid ${isStale ? '#ccc' : '#97C459'};
+            background:${bgColor};
+            border:3px solid ${borderColor};
             box-shadow:0 3px 12px rgba(0,0,0,0.4);
             display:flex;align-items:center;justify-content:center;
-            font-size:12px;font-weight:700;color:#fff;
-            cursor:pointer;
+            font-size:12px;font-weight:700;color:#fff;cursor:pointer;
           ">${initials}</div>
-          ${!isStale ? `<div style="
+          <div style="
             position:absolute;bottom:0;right:0;
             width:11px;height:11px;border-radius:50%;
-            background:#97C459;border:2px solid #fff;
-          "></div>` : ''}
+            background:${dotColor};border:2px solid #fff;
+          "></div>
         </div>`,
         iconSize: [38, 38],
         iconAnchor: [19, 19],
       });
 
+      const statusText = isLive
+        ? `<span style="color:#97C459">🟢 Live · ${timeLabel}</span>`
+        : `<span style="color:#E9A0A7">🔴 Offline · last seen ${timeLabel}</span>`;
+
       const m = L.marker([b.lat, b.lng], { icon, zIndexOffset: 1000 })
         .addTo(map)
-        .bindTooltip(`<b>👤 ${b.butler_name}</b><br>${b.squad || '—'}<br><span style="color:${isStale ? '#999' : '#2D5A0E'}">${isStale ? '⚠ Last seen ' + timeLabel : '🟢 Live · ' + timeLabel}</span>`, {
+        .bindTooltip(`<b>👤 ${b.butler_name}</b><br>${b.squad || '—'}<br>${statusText}`, {
           direction: 'top', offset: [0, -16], className: 'sv-map-tooltip', permanent: false,
         });
 
@@ -365,7 +376,7 @@ export default function MapPage() {
                   { dot: '#9CCCFC', label: 'Lonavala villas', checked: showLonavala, toggle: () => setShowLonavala(v => !v) },
                   { dot: '#97C459', label: 'Karjat villas', checked: showKarjat, toggle: () => setShowKarjat(v => !v) },
                   { dot: '#FED5A9', label: 'Pending tasks', square: true, checked: showTasks, toggle: () => setShowTasks(v => !v) },
-                  { dot: '#1B1D1F', label: `Butlers live (${butlerLocations.length})`, circle: true, checked: showButlers, toggle: () => setShowButlers(v => !v) },
+                  { dot: '#1B1D1F', label: `Butlers (${butlerLocations.length}) 🟢live 🔴offline`, circle: true, checked: showButlers, toggle: () => setShowButlers(v => !v) },
                 ].map(l => (
                   <label key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}>
                     <div style={{ position: 'relative', width: 18, height: 18, flexShrink: 0 }}>
