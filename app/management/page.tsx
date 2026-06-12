@@ -58,21 +58,62 @@ function ButlerHistoryReport({ profiles }: { profiles: Profile[] }) {
     setLoaded(true)
   }
 
-  function downloadCSV() {
-    const headers = ['Name', 'Squad', 'Total Delights', 'Completed Delights', 'Photos Uploaded', 'Total Tasks', 'Completed Tasks', 'Quiz Attempts', 'Avg Quiz Score', 'Quizzes Passed', 'Huddles Attended', 'Trainings Attended']
-    const rows = data.map(b => [
-      b.name, b.squad ?? '', b.totalDelights, b.completedDelights, b.totalPhotos,
-      b.totalTasks, b.completedTasks, b.quizAttempts,
-      b.avgQuizScore !== null ? b.avgQuizScore + '%' : 'N/A',
-      b.quizPassed, b.huddlesAttended, b.trainingsAttended
+  // Escape a CSV cell value — wrap in quotes if it contains commas/quotes/newlines
+  function csvCell(val: any): string {
+    const str = val === null || val === undefined ? '' : String(val)
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return '"' + str.replace(/"/g, '""') + '"'
+    }
+    return str
+  }
+
+  function downloadCSV(butlerData?: any) {
+    // If butlerData passed, export single butler; else export all
+    const rows = butlerData ? [butlerData] : data
+    if (!rows || rows.length === 0) { alert('No data to export. Click Generate report first.'); return; }
+
+    const headers = [
+      'Name', 'Squad', 'Role', 'Email',
+      'Total Delights', 'Completed Delights', 'Photos Uploaded',
+      'Total Tasks', 'Completed Tasks', 'Task Completion %',
+      'Quiz Attempts', 'Avg Quiz Score', 'Quizzes Passed',
+      'Huddles Attended', 'Total Huddles',
+      'Trainings Attended'
+    ]
+
+    const csvRows = rows.map((b: any) => [
+      csvCell(b.name),
+      csvCell(b.squad ?? ''),
+      csvCell(b.role ?? 'butler'),
+      csvCell(b.email ?? ''),
+      b.totalDelights,
+      b.completedDelights,
+      b.totalPhotos,
+      b.totalTasks,
+      b.completedTasks,
+      b.totalTasks > 0 ? Math.round(b.completedTasks / b.totalTasks * 100) + '%' : '0%',
+      b.quizAttempts,
+      b.avgQuizScore !== null && b.avgQuizScore !== undefined ? b.avgQuizScore + '%' : 'N/A',
+      b.quizPassed,
+      b.huddlesAttended,
+      b.totalHuddles,
+      b.trainingsAttended,
     ])
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+
+    const csv = [headers.join(','), ...csvRows.map((r: any) => r.join(','))].join('\n')
+    const bom = '\uFEFF' // UTF-8 BOM for Excel compatibility
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `butler_history_${new Date().toISOString().split('T')[0]}.csv`
+    const filename = butlerData
+      ? `${butlerData.name.replace(/\s+/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`
+      : `butler_history_all_${new Date().toISOString().split('T')[0]}.csv`
+    a.download = filename
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -83,7 +124,11 @@ function ButlerHistoryReport({ profiles }: { profiles: Profile[] }) {
           <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>Full activity breakdown — delights, photos, tasks, quizzes, attendance</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {loaded && <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={downloadCSV}>⬇ Download CSV</button>}
+          {loaded && (
+            <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => downloadCSV()}>
+              ⬇ Download all CSV
+            </button>
+          )}
           <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={loadReport} disabled={loading}>
             {loading ? 'Loading…' : loaded ? '↻ Refresh' : 'Generate report'}
           </button>
@@ -142,10 +187,16 @@ function ButlerHistoryReport({ profiles }: { profiles: Profile[] }) {
                     <td style={{ color: 'var(--muted-fg)' }}>{b.huddlesAttended}/{b.totalHuddles}</td>
                     <td style={{ color: 'var(--muted-fg)' }}>{b.trainingsAttended}</td>
                     <td>
-                      <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }}
-                        onClick={() => setSelected(selected?.id === b.id ? null : b)}>
-                        {selected?.id === b.id ? 'Hide' : 'View history'}
-                      </button>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }}
+                          onClick={() => setSelected(selected?.id === b.id ? null : b)}>
+                          {selected?.id === b.id ? 'Hide' : 'View history'}
+                        </button>
+                        <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '4px 8px' }}
+                          onClick={() => downloadCSV(b)}>
+                          ⬇ CSV
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
