@@ -7,7 +7,7 @@ import { useButlerLocation } from '@/lib/use-butler-location'
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { status: locStatus } = useButlerLocation(user as any)
+  const { status: locStatus } = useButlerLocation(user?.role === 'butler' ? user as any : null)
   const [stats, setStats] = useState({ butlers: 0, tasks: 0, delights: 0, huddles: 0 })
   const [taskStats, setTaskStats] = useState({ completed: 0, pending: 0 })
   const [loading, setLoading] = useState(true)

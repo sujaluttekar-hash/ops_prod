@@ -183,7 +183,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  useButlerLocation(user as any); // background location tracking for butlers
+  useButlerLocation(user?.role === 'butler' ? user as any : null); // ONLY butlers
   const isLoginPage = pathname === '/login';
 
   useEffect(() => {

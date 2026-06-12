@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 export type LocationStatus = 'idle' | 'requesting' | 'active' | 'denied' | 'unsupported';
 
 export function useButlerLocation(user: { id: string; name: string; squad?: string | null; role: string } | null) {
+  // GUARD: if user is null or not a butler, return immediately — no geolocation calls
+  const isButler = user?.role === 'butler';
   const [status, setStatus] = useState<LocationStatus>('idle');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startedRef = useRef(false);
@@ -19,6 +21,7 @@ export function useButlerLocation(user: { id: string; name: string; squad?: stri
   }
 
   function startTracking(u: any) {
+    if (!u || u.role !== 'butler') return; // never track non-butlers
     if (startedRef.current) return;
     if (!navigator?.geolocation) { setStatus('unsupported'); return; }
     startedRef.current = true;
@@ -47,23 +50,25 @@ export function useButlerLocation(user: { id: string; name: string; squad?: stri
   }
 
   useEffect(() => {
-    // Read user from localStorage directly — don't rely on auth context timing
+    // ONLY run for butlers — hard gate before any geolocation call
     try {
       const stored = localStorage.getItem('sv_local_session');
       if (!stored) return;
       const u = JSON.parse(stored);
-      if (u.role !== 'butler') return;
-      // Small delay to let the page settle before asking for permission
+      // Strict role check — never ask non-butlers for location
+      if (!u || u.role !== 'butler') return;
       const t = setTimeout(() => startTracking(u), 1500);
       return () => clearTimeout(t);
     } catch {}
   }, []);
 
-  // Also trigger if user prop changes (auth context resolves later)
+  // Also trigger when auth context resolves — but only for butlers
   useEffect(() => {
-    if (!user || user.role !== 'butler' || startedRef.current) return;
+    if (!user) return;
+    if (user.role !== 'butler') return; // NEVER track admin/supervisor
+    if (startedRef.current) return;
     startTracking(user);
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
 
   return { status };
 }
