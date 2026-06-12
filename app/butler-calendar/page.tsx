@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
+import { useAuth } from '@/lib/auth-context';
+import { isSupervisor } from '@/lib/auth';
 import { fetchProfiles, fetchGuestDelights, fetchHuddles, fetchTrainings, getSupabase, getServiceSupabase, type Profile, type GuestDelight, type Huddle, type Training } from '@/lib/supabase';
 
 type DayEvent = {
@@ -44,7 +46,17 @@ export default function ButlerCalendarPage() {
   useEffect(() => {
     fetchProfiles().then(p => {
       setProfiles(p);
-      if (p.length > 0) setSelectedButler(p[0]);
+      try {
+        const stored = localStorage.getItem('sv_local_session');
+        if (stored) {
+          const lu = JSON.parse(stored);
+          if (lu.role === 'butler') {
+            setSelectedButler(p.find((b: any) => b.id === lu.id) || p[0]);
+          } else {
+            setSelectedButler(p[0]);
+          }
+        } else { setSelectedButler(p[0]); }
+      } catch { setSelectedButler(p[0]); }
     });
   }, []);
 

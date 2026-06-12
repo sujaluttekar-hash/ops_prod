@@ -105,9 +105,14 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           </button>
         </div>
 
-        <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(254,213,169,0.2)', borderRadius: 8, fontSize: 11, color: '#7A4A08', lineHeight: 1.5 }}>
-          ⚠ After adding, also update the login credentials in the codebase (<code>app/login/page.tsx</code>) so the user can log in.
-        </div>
+        {form.email && form.password && (
+          <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(156,204,252,0.1)', borderRadius: 8, fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>📋 Add this line to app/login/page.tsx USERS object:</div>
+            <code style={{ fontSize: 10, display: 'block', background: 'rgba(0,0,0,0.05)', padding: '6px 8px', borderRadius: 5, wordBreak: 'break-all' }}>
+              {`'${form.email}': { id: '<UUID>', password: '${form.password}', role: '${form.role}', name: '${form.name}', squad: '${form.squad || null}' },`}
+            </code>
+          </div>
+        )}
       </div>
     </div>
   );

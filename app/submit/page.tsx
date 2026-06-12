@@ -2,7 +2,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { insertSubmission, uploadTaskPhoto, getSupabase, getServiceSupabase } from '@/lib/supabase';
-import { getCurrentUser, type AppUser } from '@/lib/auth';
 
 const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie'] as const;
 const TASK_EMOJI: Record<string,string> = {
@@ -13,7 +12,7 @@ const TASK_EMOJI: Record<string,string> = {
 };
 
 export default function SubmitPage() {
-  const [user, setUser] = useState<AppUser | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [form, setForm] = useState({ task_type: '', property: '', notes: '' });
   const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
   const [saving, setSaving] = useState(false);

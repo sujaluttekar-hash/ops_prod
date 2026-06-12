@@ -82,6 +82,7 @@ function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onC
   async function handleSave(e: React.FormEvent) {
     e.preventDefault(); setSaving(true); setError('');
     try {
+      if (!form.villa_name) { alert('Please select a villa from the dropdown.'); setSaving(false); return; }
       const { data, error: insertErr } = await insertGuestDelight({ your_name: form.your_name, squad: form.squad, booking_date: form.booking_date, booking_id: form.booking_id || null, villa_name: form.villa_name, booking_type: form.booking_type, status: 'pending' });
       if (insertErr) throw new Error(insertErr.message);
       if (data?.id) {

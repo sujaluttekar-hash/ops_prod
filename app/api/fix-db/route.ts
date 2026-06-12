@@ -5,29 +5,31 @@ const SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi
 const H = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}`, 'Content-Type': 'application/json' }
 
 export async function GET() {
-  // Try inserting directly to see if table exists
-  const testRes = await fetch(`${SURL}/rest/v1/butler_locations?limit=1`, {
-    headers: { 'apikey': SVC, 'Authorization': `Bearer ${SVC}` }
-  })
-  const testData = await testRes.json()
-  const tableExists = testRes.ok && !testData?.code
+  const results: any = {}
 
-  return NextResponse.json({
-    tableExists,
-    tableStatus: testRes.status,
-    message: tableExists
-      ? 'butler_locations table EXISTS ✅'
-      : 'butler_locations table MISSING ❌ — run SQL in Supabase dashboard',
-    sql: `CREATE TABLE IF NOT EXISTS butler_locations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  butler_id UUID NOT NULL,
-  butler_name TEXT NOT NULL,
-  squad TEXT,
-  lat DOUBLE PRECISION NOT NULL,
-  lng DOUBLE PRECISION NOT NULL,
-  accuracy DOUBLE PRECISION,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-CREATE UNIQUE INDEX IF NOT EXISTS butler_locations_butler_id_idx ON butler_locations(butler_id);`
+  // 1. Delete test tasks
+  const delRes = await fetch(`${SURL}/rest/v1/tasks?type=in.("TEST - Please delete","TEST_TASK","TEST")`, {
+    method: 'DELETE', headers: H
   })
+  results.deletedTestTasks = delRes.status
+
+  // 2. Check tables exist
+  const tables = ['butler_locations', 'attendance']
+  for (const t of tables) {
+    const r = await fetch(`${SURL}/rest/v1/${t}?limit=1`, { headers: H })
+    results[`table_${t}`] = r.ok ? 'EXISTS ✅' : `MISSING ❌ (${r.status})`
+  }
+
+  // 3. Task counts
+  const tasksR = await fetch(`${SURL}/rest/v1/tasks?select=id,status`, { headers: H })
+  const tasks = await tasksR.json()
+  results.totalTasks = Array.isArray(tasks) ? tasks.length : 'error'
+  results.pendingTasks = Array.isArray(tasks) ? tasks.filter((t: any) => t.status === 'pending').length : 0
+
+  // 4. Butler locations
+  const locR = await fetch(`${SURL}/rest/v1/butler_locations?select=butler_name,updated_at`, { headers: H })
+  const locs = await locR.json()
+  results.butlerLocations = Array.isArray(locs) ? locs.length : 'table missing'
+
+  return NextResponse.json(results)
 }
