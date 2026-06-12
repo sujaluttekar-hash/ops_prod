@@ -54,6 +54,87 @@ export default function ReportsPage() {
     });
   }, []);
 
+  // ── CSV export utility ─────────────────────────────────────
+  function dl(filename: string, content: string) {
+    const bom = '﻿';
+    const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+  function cell(v: any) {
+    const s = v === null || v === undefined ? '' : String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function toCSV(headers: string[], rows: any[][]) {
+    return [headers.join(','), ...rows.map(r => r.map(cell).join(','))].join('\n');
+  }
+
+  function exportButlerPerformance() {
+    if (!butlerStats.length) { alert('Data still loading. Please wait.'); return; }
+    const csv = toCSV(
+      ['Name','Squad','Role','Delights Done','Total Delights','Delight %','Avg Quiz Score','Huddles Attended','Total Huddles','Huddle %'],
+      butlerStats.map(b => [
+        b.name, b.squad ?? '', b.role ?? 'butler',
+        b.delightsDone, b.totalDelights,
+        b.totalDelights > 0 ? Math.round(b.delightsDone / b.totalDelights * 100) + '%' : '0%',
+        b.avgQuizScore !== null ? b.avgQuizScore + '%' : 'N/A',
+        b.huddlesAttended, b.totalHuddles,
+        b.totalHuddles > 0 ? Math.round(b.huddlesAttended / b.totalHuddles * 100) + '%' : '0%',
+      ])
+    );
+    dl(`butler_performance_${new Date().toISOString().split('T')[0]}.csv`, csv);
+  }
+
+  function exportAttendance() {
+    if (!trainings.length && !huddles.length) { alert('Data still loading.'); return; }
+    const csv = toCSV(
+      ['Type','Name/Team','Date','Status','Expected','Attended'],
+      [
+        ...trainings.map((t: any) => ['Training', t.name || t.type || '—', t.date || '—', t.status || '—', t.total_seats || '—', '—']),
+        ...huddles.map((h: any) => ['Huddle', h.team || '—', h.huddle_date || '—', h.status || '—', h.participants_expected || '—', h.participants_attended || '—']),
+      ]
+    );
+    dl(`attendance_analytics_${new Date().toISOString().split('T')[0]}.csv`, csv);
+  }
+
+  function exportTaskTrends() {
+    if (!stats.tasks.length) { alert('No task data yet.'); return; }
+    const csv = toCSV(
+      ['Task ID','Type','Status','Butler ID','Villa (from notes)','Due Time','Completed At'],
+      stats.tasks.map((t: any) => {
+        const villaMatch = t.notes?.match(/Villa: ([^·]+)/);
+        return [t.id, t.type, t.status, t.butler_id || '—', villaMatch?.[1]?.trim() || '—', t.due_time || '—', t.completed_at || '—'];
+      })
+    );
+    dl(`task_trends_${new Date().toISOString().split('T')[0]}.csv`, csv);
+  }
+
+  function exportDelightSummary() {
+    if (!delights.length) { alert('No delight data yet.'); return; }
+    const csv = toCSV(
+      ['Butler Name','Villa','Booking Type','Booking Date','Booking ID','Status','Photos'],
+      delights.map((d: any) => [
+        d.your_name, d.villa_name || '—', d.booking_type || '—',
+        d.booking_date || '—', d.booking_id || '—', d.status || '—',
+        d.delight_photos?.length ?? 0,
+      ])
+    );
+    dl(`guest_delight_summary_${new Date().toISOString().split('T')[0]}.csv`, csv);
+  }
+
+  function exportQuizLeaderboard() {
+    if (!butlerStats.length) { alert('Data still loading.'); return; }
+    const sorted = [...butlerStats].sort((a, b) => (b.avgQuizScore ?? -1) - (a.avgQuizScore ?? -1));
+    const csv = toCSV(
+      ['Rank','Butler','Squad','Avg Score','Huddles Attended'],
+      sorted.map((b, i) => [i + 1, b.name, b.squad ?? '', b.avgQuizScore !== null ? b.avgQuizScore + '%' : 'N/A', b.huddlesAttended])
+    );
+    dl(`quiz_leaderboard_${new Date().toISOString().split('T')[0]}.csv`, csv);
+  }
+
   const delightDone = stats.delights.filter((d: any) => d.status === 'completed').length;
   const taskDone = stats.tasks.filter((t: any) => t.status === 'completed').length;
   const completionPct = stats.delights.length > 0 ? Math.round(delightDone / stats.delights.length * 100) : 0;
@@ -61,7 +142,7 @@ export default function ReportsPage() {
   return (
     <>
       <Topbar title="MIS & Reports" subtitle="Live performance dashboard"
-        actions={<button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }}>⬇ Export</button>} />
+        actions={<button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={exportButlerPerformance}>⬇ Export all</button>} />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
 
@@ -175,18 +256,18 @@ export default function ReportsPage() {
           <div className="sv-card">
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Export reports</div>
             {[
-              { name: 'Butler performance report', desc: 'Full scorecard — all KPIs', format: 'PDF' },
-              { name: 'Attendance analytics', desc: 'Huddles + training attendance', format: 'Excel' },
-              { name: 'Task completion trends', desc: 'By property + butler', format: 'CSV' },
-              { name: 'Guest delight summary', desc: 'Category-wise breakdown', format: 'PDF' },
-              { name: 'Quiz leaderboard', desc: 'All attempts + pass rates', format: 'CSV' },
+              { name: 'Butler performance report', desc: 'All KPIs per butler — delight %, quiz score, huddle attendance', fn: exportButlerPerformance },
+              { name: 'Attendance analytics', desc: 'Huddles + training sessions with dates and status', fn: exportAttendance },
+              { name: 'Task completion trends', desc: 'All tasks with type, status, villa, butler, due time', fn: exportTaskTrends },
+              { name: 'Guest delight summary', desc: 'All delight entries with villa, booking type, photo count', fn: exportDelightSummary },
+              { name: 'Quiz leaderboard', desc: 'All butlers ranked by avg quiz score', fn: exportQuizLeaderboard },
             ].map(r => (
               <div key={r.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{r.desc}</div>
                 </div>
-                <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '5px 10px' }}>⬇ {r.format}</button>
+                <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '5px 10px' }} onClick={r.fn}>⬇ CSV</button>
               </div>
             ))}
           </div>
