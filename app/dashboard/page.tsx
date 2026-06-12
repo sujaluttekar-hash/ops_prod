@@ -3,9 +3,11 @@ import { useState, useEffect } from 'react'
 import Topbar from '@/components/layout/Topbar'
 import { fetchProfiles, fetchTasks, fetchHuddles, fetchGuestDelights } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { useButlerLocation } from '@/lib/use-butler-location'
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const { status: locStatus } = useButlerLocation(user as any)
   const [stats, setStats] = useState({ butlers: 0, tasks: 0, delights: 0, huddles: 0 })
   const [taskStats, setTaskStats] = useState({ completed: 0, pending: 0 })
   const [loading, setLoading] = useState(true)
@@ -52,6 +54,29 @@ export default function DashboardPage() {
       />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
+
+        {/* Location permission banner — butler only */}
+        {user?.role === 'butler' && locStatus === 'denied' && (
+          <div style={{ background: 'rgba(233,160,167,0.12)', border: '1px solid #E9A0A7', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 20 }}>📍</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#8B2020' }}>Location access denied</div>
+              <div style={{ fontSize: 11, color: '#8B2020', marginTop: 2 }}>Enable location in browser settings so your supervisor can see your position on the map.</div>
+            </div>
+          </div>
+        )}
+        {user?.role === 'butler' && locStatus === 'active' && (
+          <div style={{ background: 'rgba(151,196,89,0.1)', border: '1px solid #97C459', borderRadius: 10, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>📍</span>
+            <div style={{ fontSize: 12, color: '#2D5A0E', fontWeight: 500 }}>Location sharing active — your supervisor can see you on the map.</div>
+          </div>
+        )}
+        {user?.role === 'butler' && locStatus === 'requesting' && (
+          <div style={{ background: 'rgba(156,204,252,0.1)', border: '1px solid #9CCCFC', borderRadius: 10, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>📍</span>
+            <div style={{ fontSize: 12, color: '#0C447C' }}>Requesting location permission…</div>
+          </div>
+        )}
 
         {/* Metrics */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>

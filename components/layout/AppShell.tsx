@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getServiceSupabase } from '@/lib/supabase';
+import { useButlerLocation } from '@/lib/use-butler-location';
 
 type NavItem = { label: string; href: string; icon: string };
 type NavSection = { overview: NavItem[]; operations: NavItem[]; learning: NavItem[]; admin: NavItem[] };
@@ -182,6 +183,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  useButlerLocation(user as any); // background location tracking for butlers
   const isLoginPage = pathname === '/login';
 
   useEffect(() => {

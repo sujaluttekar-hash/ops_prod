@@ -4,45 +4,30 @@ const SURL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
 const SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
 const H = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}`, 'Content-Type': 'application/json' }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const uid = searchParams.get('uid') || 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2' // Kohinoor
-  const name = searchParams.get('name') || 'Kohinoor Shinde'
-
-  // 1. Insert a TEST task for this butler
-  const taskRes = await fetch(`${SURL}/rest/v1/tasks`, {
-    method: 'POST', headers: { ...H, 'Prefer': 'return=representation' },
-    body: JSON.stringify({
-      type: 'TEST - Please delete',
-      butler_id: uid,
-      status: 'pending',
-      notes: `Butler: ${name} · ButlerID: ${uid} · Villa: Test Villa`,
-    })
+export async function GET() {
+  // Try inserting directly to see if table exists
+  const testRes = await fetch(`${SURL}/rest/v1/butler_locations?limit=1`, {
+    headers: { 'apikey': SVC, 'Authorization': `Bearer ${SVC}` }
   })
-  const taskData = await taskRes.json()
-
-  // 2. Insert a notification
-  const notifRes = await fetch(`${SURL}/rest/v1/notifications`, {
-    method: 'POST', headers: { ...H, 'Prefer': 'return=representation' },
-    body: JSON.stringify({ user_id: uid, title: 'Test task assigned', body: `TEST notification for ${name}`, type: 'task', read: false })
-  })
-  const notifData = await notifRes.json()
-
-  // 3. Fetch butler's tasks
-  const tasksRes = await fetch(`${SURL}/rest/v1/tasks?select=id,type,butler_id,status&order=created_at.desc`, { headers: H })
-  const allTasks = await tasksRes.json()
-  const mine = Array.isArray(allTasks) ? allTasks.filter((t: any) => t.butler_id === uid) : []
-
-  // 4. Fetch butler's notifications
-  const notifsRes = await fetch(`${SURL}/rest/v1/notifications?select=id,title,body,type,read&eq.user_id=${uid}&order=created_at.desc&limit=5`, { headers: H })
-  const notifs = await notifsRes.json()
+  const testData = await testRes.json()
+  const tableExists = testRes.ok && !testData?.code
 
   return NextResponse.json({
-    taskInserted: taskRes.status === 201 ? '✅ Task saved' : `❌ Failed: ${JSON.stringify(taskData)}`,
-    notifInserted: notifRes.status === 201 ? '✅ Notification saved' : `❌ Failed: ${JSON.stringify(notifData)}`,
-    butlerTaskCount: mine.length,
-    sampleTasks: mine.slice(0,3),
-    notifications: notifs,
-    action: 'Now open the butler app and hit Refresh on My Tasks page'
+    tableExists,
+    tableStatus: testRes.status,
+    message: tableExists
+      ? 'butler_locations table EXISTS ✅'
+      : 'butler_locations table MISSING ❌ — run SQL in Supabase dashboard',
+    sql: `CREATE TABLE IF NOT EXISTS butler_locations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  butler_id UUID NOT NULL,
+  butler_name TEXT NOT NULL,
+  squad TEXT,
+  lat DOUBLE PRECISION NOT NULL,
+  lng DOUBLE PRECISION NOT NULL,
+  accuracy DOUBLE PRECISION,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS butler_locations_butler_id_idx ON butler_locations(butler_id);`
   })
 }

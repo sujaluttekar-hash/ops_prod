@@ -31,6 +31,22 @@ export default function MapPage() {
   const [showTasks, setShowTasks] = useState(true);
   const [taskPins, setTaskPins] = useState<TaskPin[]>([]);
   const taskMarkersRef = useRef<any[]>([]);
+  const [showButlers, setShowButlers] = useState(true);
+  const [butlerLocations, setButlerLocations] = useState<any[]>([]);
+  const butlerMarkersRef = useRef<any[]>([]);
+
+  // Load live butler locations — poll every 30s
+  useEffect(() => {
+    function fetchLocations() {
+      fetch('/api/location', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => { if (Array.isArray(data)) setButlerLocations(data); })
+        .catch(() => {});
+    }
+    fetchLocations();
+    const t = setInterval(fetchLocations, 30000);
+    return () => clearInterval(t);
+  }, []);
 
   // Load active tasks and match to property coordinates
   useEffect(() => {
@@ -169,6 +185,60 @@ export default function MapPage() {
     });
   }, [taskPins, showTasks, mapLoaded]);
 
+  // Render live butler pins
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+    const L = (window as any).L;
+    const map = mapInstanceRef.current;
+    butlerMarkersRef.current.forEach(m => map.removeLayer(m));
+    butlerMarkersRef.current = [];
+    if (!showButlers) return;
+
+    const staleThreshold = Date.now() - 5 * 60 * 1000; // 5 minutes
+
+    butlerLocations.forEach(b => {
+      const updatedMs = new Date(b.updated_at).getTime();
+      const isStale = updatedMs < staleThreshold;
+      const minutesAgo = Math.floor((Date.now() - updatedMs) / 60000);
+      const timeLabel = minutesAgo < 1 ? 'just now' : `${minutesAgo}m ago`;
+
+      const initials = (b.butler_name || '??').split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase();
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="
+          position:relative;
+          width:38px;height:38px;
+        ">
+          <div style="
+            width:38px;height:38px;border-radius:50%;
+            background:${isStale ? '#aaa' : '#1B1D1F'};
+            border:3px solid ${isStale ? '#ccc' : '#97C459'};
+            box-shadow:0 3px 12px rgba(0,0,0,0.4);
+            display:flex;align-items:center;justify-content:center;
+            font-size:12px;font-weight:700;color:#fff;
+            cursor:pointer;
+          ">${initials}</div>
+          ${!isStale ? `<div style="
+            position:absolute;bottom:0;right:0;
+            width:11px;height:11px;border-radius:50%;
+            background:#97C459;border:2px solid #fff;
+          "></div>` : ''}
+        </div>`,
+        iconSize: [38, 38],
+        iconAnchor: [19, 19],
+      });
+
+      const m = L.marker([b.lat, b.lng], { icon, zIndexOffset: 1000 })
+        .addTo(map)
+        .bindTooltip(`<b>👤 ${b.butler_name}</b><br>${b.squad || '—'}<br><span style="color:${isStale ? '#999' : '#2D5A0E'}">${isStale ? '⚠ Last seen ' + timeLabel : '🟢 Live · ' + timeLabel}</span>`, {
+          direction: 'top', offset: [0, -16], className: 'sv-map-tooltip', permanent: false,
+        });
+
+      butlerMarkersRef.current.push(m);
+    });
+  }, [butlerLocations, showButlers, mapLoaded]);
+
   function flyTo(p: Property) {
     setSelected(p);
     if (mapInstanceRef.current) {
@@ -201,9 +271,12 @@ export default function MapPage() {
 
       <Topbar
         title="Property Map"
-        subtitle={`${filtered.length} of ${PROPERTIES.length} villas · ${taskPins.filter(t => t.status === 'pending').length} active tasks`}
+        subtitle={`${filtered.length} of ${PROPERTIES.length} villas · ${taskPins.filter(t => t.status === 'pending').length} tasks · ${butlerLocations.length} butlers live`}
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
+            <button className="sv-btn" style={{ fontSize: 11, padding: '5px 10px', background: showButlers ? '#1B1D1F' : undefined, color: showButlers ? '#97C459' : undefined, borderColor: showButlers ? '#97C459' : undefined }} onClick={() => setShowButlers(v => !v)}>
+              {`👤 ${butlerLocations.length > 0 ? butlerLocations.length + ' live' : 'Butlers'}`}
+            </button>
             <button className="sv-btn" style={{ fontSize: 11, padding: '5px 10px', background: showTasks ? '#FED5A9' : undefined, color: showTasks ? '#7A4A08' : undefined, borderColor: showTasks ? '#7A4A08' : undefined }} onClick={() => setShowTasks(v => !v)}>
               {showTasks ? '⏳ Tasks on' : '⏳ Tasks off'}
             </button>
@@ -284,9 +357,10 @@ export default function MapPage() {
                   { dot: '#97C459', label: 'Karjat villa' },
                   { dot: '#FED5A9', label: 'Pending task', square: true },
                   { dot: '#97C459', label: 'Completed task', square: true },
+                  { dot: '#1B1D1F', label: 'Butler (live)', circle: true },
                 ].map(l => (
                   <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <div style={{ width: l.square ? 10 : 8, height: l.square ? 10 : 8, borderRadius: l.square ? 2 : '50%', background: l.dot, flexShrink: 0, border: '1.5px solid rgba(0,0,0,0.15)' }} />
+                    <div style={{ width: 10, height: 10, borderRadius: (l as any).square ? 2 : '50%', background: l.dot, flexShrink: 0, border: (l as any).circle ? '2px solid #97C459' : '1.5px solid rgba(0,0,0,0.15)' }} />
                     <span style={{ color: '#444' }}>{l.label}</span>
                   </div>
                 ))}
