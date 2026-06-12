@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { getServiceSupabase } from '@/lib/supabase';
+import { saveButlerLocation, getCurrentPosition } from '@/lib/get-location';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
 
@@ -54,10 +55,36 @@ export default function AttendancePage() {
   async function markAttendance(butlerId: string, status: string) {
     setMarkingId(butlerId);
     const now = new Date().toTimeString().slice(0, 5);
+
+    // Get GPS — only for present/half_day
+    let geo_lat: number | null = null;
+    let geo_lng: number | null = null;
+    if (status !== 'absent') {
+      const pos = await getCurrentPosition();
+      if (pos) { geo_lat = pos.lat; geo_lng = pos.lng; }
+    }
+
     await getServiceSupabase().from('attendance').upsert({
       date, butler_id: butlerId, status,
       check_in: status !== 'absent' ? now : null,
+      geo_lat, geo_lng,
     }, { onConflict: 'date,butler_id' });
+
+    // If the butler is marking themselves present, also update their live location on the map
+    try {
+      const stored = localStorage.getItem('sv_local_session');
+      if (stored && status !== 'absent') {
+        const u = JSON.parse(stored);
+        if (u.id === butlerId && geo_lat && geo_lng) {
+          await fetch('/api/location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ butler_id: u.id, butler_name: u.name, squad: u.squad || null, lat: geo_lat, lng: geo_lng, accuracy: 0 }),
+          });
+        }
+      }
+    } catch {}
+
     await load();
     setMarkingId(null);
   }

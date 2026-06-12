@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { fetchTasks, getServiceSupabase, uploadTaskPhoto, type Task } from '@/lib/supabase';
+import { getCurrentPosition } from '@/lib/get-location';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
@@ -28,15 +29,21 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
   async function handleSubmit() {
     setSaving(true);
     try {
+      // Get GPS location at time of task completion
+      const pos = await getCurrentPosition();
+
       let photo_url: string | null = null;
       if (photo) {
         photo_url = await uploadTaskPhoto(photo.file, task.id);
       }
+
       const { error } = await getServiceSupabase().from('tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         notes: [isCustom && customTaskName ? `Task: ${customTaskName}` : '', notes || task.notes || ''].filter(Boolean).join(' · ') || null,
         photo_path: photo_url || task.photo_path || null,
+        geo_lat: pos?.lat || null,
+        geo_lng: pos?.lng || null,
       }).eq('id', task.id);
 
       if (error) {
@@ -45,8 +52,23 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
         return;
       }
 
+      // Update butler's live location on the map
+      if (pos) {
+        try {
+          const stored = localStorage.getItem('sv_local_session');
+          if (stored) {
+            const u = JSON.parse(stored);
+            await fetch('/api/location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ butler_id: u.id, butler_name: u.name, squad: u.squad || null, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy }),
+            });
+          }
+        } catch {}
+      }
+
       setDone(true);
-      onDone(task.id); // update parent state immediately
+      onDone(task.id);
       setTimeout(() => { onClose(); }, 1200);
     } catch (e: any) {
       alert('Error: ' + e.message);

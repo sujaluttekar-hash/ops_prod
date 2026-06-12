@@ -50,37 +50,43 @@ export default function MapPage() {
     return () => clearInterval(t);
   }, []);
 
-  // Load active tasks and match to property coordinates
+  // Load active tasks — use geo_lat/geo_lng if available, else match villa name
   useEffect(() => {
-    getServiceSupabase()
-      .from('tasks')
-      .select('id, type, status, notes, due_time, profiles(name)')
-      .in('status', ['pending', 'completed'])
-      .order('created_at', { ascending: false })
-      .limit(200)
-      .then(({ data }: any) => {
-        if (!data) return;
+    fetch('/api/tasks?all=1', { cache: 'no-store' })
+      .then(r => r.json())
+      .then((data: any[]) => {
+        if (!Array.isArray(data)) return;
         const pins: TaskPin[] = [];
-        data.forEach((t: any) => {
-          // Extract villa name from notes
+        data.filter(t => t.status === 'pending' || t.status === 'completed').forEach((t: any) => {
+          // Use actual GPS location if task was completed with GPS
+          if (t.geo_lat && t.geo_lng) {
+            const villaMatch = t.notes?.match(/Villa: ([^·]+)/);
+            pins.push({
+              id: t.id, type: t.type, status: t.status,
+              butler: t.butler_name || t.notes?.match(/Butler: ([^·]+)/)?.[1]?.trim() || 'Butler',
+              villa: villaMatch?.[1]?.trim() || '—',
+              due_time: t.due_time,
+              lat: t.geo_lat, lng: t.geo_lng,
+            });
+            return;
+          }
+          // Fallback: match villa name from notes to property coordinates
           const villaMatch = t.notes?.match(/Villa: ([^·]+)/);
-          const villaName = villaMatch ? villaMatch[1].trim() : null;
-          if (!villaName) return;
-          const prop = PROPERTIES.find(p => p.name.toLowerCase() === villaName.toLowerCase() || p.name.toLowerCase().includes(villaName.toLowerCase()));
+          if (!villaMatch) return;
+          const villaName = villaMatch[1].trim();
+          const prop = PROPERTIES.find((p: any) => p.name.toLowerCase() === villaName.toLowerCase() || p.name.toLowerCase().includes(villaName.toLowerCase()));
           if (!prop) return;
+          const butlerMatch = t.notes?.match(/Butler: ([^·]+)/);
           pins.push({
-            id: t.id,
-            type: t.type,
-            status: t.status,
-            butler: t.profiles?.name || 'Butler',
+            id: t.id, type: t.type, status: t.status,
+            butler: butlerMatch?.[1]?.trim() || 'Butler',
             villa: villaName,
             due_time: t.due_time,
-            lat: prop.lat,
-            lng: prop.lng,
+            lat: prop.lat, lng: prop.lng,
           });
         });
         setTaskPins(pins);
-      });
+      }).catch(() => {});
   }, []);
 
   const filtered = PROPERTIES.filter(p => {

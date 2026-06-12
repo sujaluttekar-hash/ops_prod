@@ -12,3 +12,7 @@ CREATE TABLE IF NOT EXISTS butler_locations (
 
 -- Only one row per butler (upsert on butler_id)
 CREATE UNIQUE INDEX IF NOT EXISTS butler_locations_butler_id_idx ON butler_locations(butler_id);
+
+-- Add geo columns to attendance table for check-in location
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS geo_lat DOUBLE PRECISION;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS geo_lng DOUBLE PRECISION;
