@@ -34,6 +34,8 @@ export default function MapPage() {
   const [showButlers, setShowButlers] = useState(true);
   const [butlerLocations, setButlerLocations] = useState<any[]>([]);
   const butlerMarkersRef = useRef<any[]>([]);
+  const [showLonavala, setShowLonavala] = useState(true);
+  const [showKarjat, setShowKarjat] = useState(true);
 
   // Load live butler locations — poll every 30s
   useEffect(() => {
@@ -122,7 +124,13 @@ export default function MapPage() {
     markersRef.current.forEach(m => map.removeLayer(m));
     markersRef.current = [];
 
-    filtered.forEach(p => {
+    // Apply squad visibility filter
+    const visibleVillas = filtered.filter(p => {
+      if (p.squad === 'Lonavala' && !showLonavala) return false;
+      if (p.squad === 'Karjat' && !showKarjat) return false;
+      return true;
+    });
+    visibleVillas.forEach(p => {
       const color = SQUAD_COLORS[p.squad as keyof typeof SQUAD_COLORS] || '#E9A0A7';
       const icon = L.divIcon({
         className: '',
@@ -151,7 +159,7 @@ export default function MapPage() {
 
       markersRef.current.push(marker);
     });
-  }, [filtered, mapLoaded]);
+  }, [filtered, showLonavala, showKarjat, mapLoaded]);
 
   // Render task pins as activity markers
   useEffect(() => {
@@ -274,12 +282,7 @@ export default function MapPage() {
         subtitle={`${filtered.length} of ${PROPERTIES.length} villas · ${taskPins.filter(t => t.status === 'pending').length} tasks · ${butlerLocations.length} butlers live`}
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="sv-btn" style={{ fontSize: 11, padding: '5px 10px', background: showButlers ? '#1B1D1F' : undefined, color: showButlers ? '#97C459' : undefined, borderColor: showButlers ? '#97C459' : undefined }} onClick={() => setShowButlers(v => !v)}>
-              {`👤 ${butlerLocations.length > 0 ? butlerLocations.length + ' live' : 'Butlers'}`}
-            </button>
-            <button className="sv-btn" style={{ fontSize: 11, padding: '5px 10px', background: showTasks ? '#FED5A9' : undefined, color: showTasks ? '#7A4A08' : undefined, borderColor: showTasks ? '#7A4A08' : undefined }} onClick={() => setShowTasks(v => !v)}>
-              {showTasks ? '⏳ Tasks on' : '⏳ Tasks off'}
-            </button>
+
             <button className="sv-btn" style={{ fontSize: 11, padding: '5px 10px', background: listView ? '#1B1D1F' : undefined, color: listView ? '#fff' : undefined }} onClick={() => setListView(v => !v)}>
               {listView ? '🗺 Map' : '☰ List'}
             </button>
@@ -349,20 +352,28 @@ export default function MapPage() {
                 </div>
               )}
 
-              {/* Map legend */}
-              <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'rgba(255,255,255,0.95)', borderRadius: 10, padding: '10px 12px', boxShadow: '0 2px 12px rgba(0,0,0,0.12)', fontSize: 11 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted-fg)' }}>Legend</div>
+              {/* Map legend — interactive checkboxes */}
+              <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'rgba(255,255,255,0.97)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 2px 16px rgba(0,0,0,0.14)', fontSize: 12, minWidth: 170 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--muted-fg)' }}>Layers</div>
                 {[
-                  { dot: '#9CCCFC', label: 'Lonavala villa' },
-                  { dot: '#97C459', label: 'Karjat villa' },
-                  { dot: '#FED5A9', label: 'Pending task', square: true },
-                  { dot: '#97C459', label: 'Completed task', square: true },
-                  { dot: '#1B1D1F', label: 'Butler (live)', circle: true },
+                  { dot: '#9CCCFC', label: 'Lonavala villas', checked: showLonavala, toggle: () => setShowLonavala(v => !v) },
+                  { dot: '#97C459', label: 'Karjat villas', checked: showKarjat, toggle: () => setShowKarjat(v => !v) },
+                  { dot: '#FED5A9', label: 'Pending tasks', square: true, checked: showTasks, toggle: () => setShowTasks(v => !v) },
+                  { dot: '#1B1D1F', label: `Butlers live (${butlerLocations.length})`, circle: true, checked: showButlers, toggle: () => setShowButlers(v => !v) },
                 ].map(l => (
-                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: (l as any).square ? 2 : '50%', background: l.dot, flexShrink: 0, border: (l as any).circle ? '2px solid #97C459' : '1.5px solid rgba(0,0,0,0.15)' }} />
-                    <span style={{ color: '#444' }}>{l.label}</span>
-                  </div>
+                  <label key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}>
+                    <div style={{ position: 'relative', width: 18, height: 18, flexShrink: 0 }}>
+                      <input type="checkbox" checked={l.checked} onChange={l.toggle}
+                        style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', margin: 0 }} />
+                      <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${l.checked ? l.dot : 'rgba(0,0,0,0.2)'}`, background: l.checked ? l.dot : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', boxSizing: 'border-box' }}>
+                        {l.checked && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 9, height: 9, borderRadius: (l as any).square ? 2 : '50%', background: l.dot, border: (l as any).circle ? '2px solid #97C459' : '1px solid rgba(0,0,0,0.15)', flexShrink: 0 }} />
+                      <span style={{ color: l.checked ? '#1B1D1F' : '#aaa', fontWeight: l.checked ? 500 : 400, transition: 'color 0.15s' }}>{l.label}</span>
+                    </div>
+                  </label>
                 ))}
               </div>
 
