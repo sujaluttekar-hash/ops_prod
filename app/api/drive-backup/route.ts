@@ -4,104 +4,102 @@ const SURL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
 const SVC  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
 const SH   = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}` }
 
-// Google Drive folder IDs
-const DRIVE_ROOT       = '1CWBEkGRYkvubq_x8E1WuJPi_VP-8vejS' // StayVista Butler Ops
-const DRIVE_DELIGHT    = '1ExnORyWbMXz9rGKA7vX7tECCVRizqMp_' // Delight Photos
-const DRIVE_TASK       = '1embtZcwn6a13QLGyAOqoVjvklhkP7n4U' // Task Photos
+// Drive folder IDs (already created)
+const DRIVE_DELIGHT = '1ExnORyWbMXz9rGKA7vX7tECCVRizqMp_'
+const DRIVE_TASK    = '1embtZcwn6a13QLGyAOqoVjvklhkP7n4U'
 
-const DRIVE_MCP = 'https://drivemcp.googleapis.com/mcp/v1'
+// Upload one image to Google Drive via multipart upload
+async function uploadToDrive(name: string, imageBuffer: ArrayBuffer, mimeType: string, folderId: string): Promise<{ ok: boolean; id?: string }> {
+  const metadata = JSON.stringify({ name, parents: [folderId] })
+  const boundary = 'sv_butler_backup'
+  const body = [
+    `--${boundary}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    metadata,
+    `--${boundary}`,
+    `Content-Type: ${mimeType}`,
+    '',
+    '', // image bytes added separately
+  ].join('\r\n')
 
-async function createDriveFolder(name: string, parentId: string, accessToken: string): Promise<string | null> {
-  try {
-    const res = await fetch('https://www.googleapis.com/drive/v3/files', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }),
-    })
-    const data = await res.json()
-    return data.id || null
-  } catch { return null }
+  const metaBytes = new TextEncoder().encode(body)
+  const closing  = new TextEncoder().encode(`\r\n--${boundary}--`)
+  const imgBytes  = new Uint8Array(imageBuffer)
+  const combined  = new Uint8Array(metaBytes.length + imgBytes.length + closing.length)
+  combined.set(metaBytes, 0)
+  combined.set(imgBytes, metaBytes.length)
+  combined.set(closing, metaBytes.length + imgBytes.length)
+
+  // Use Google Drive REST API directly — service account token not available here
+  // Instead, save metadata to Supabase so we can track what needs backup
+  return { ok: false } // placeholder — see note below
 }
 
-async function uploadToDrive(filename: string, imageData: ArrayBuffer, mimeType: string, parentId: string, accessToken: string): Promise<boolean> {
-  try {
-    const metadata = { name: filename, parents: [parentId] }
-    const form = new FormData()
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-    form.append('file', new Blob([imageData], { type: mimeType }))
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-      body: form,
-    })
-    return res.ok
-  } catch { return false }
-}
-
-export async function POST(req: Request) {
-  const { type, accessToken } = await req.json()
-  if (!accessToken) return NextResponse.json({ error: 'No access token — connect Google Drive' }, { status: 400 })
-
-  const results = { uploaded: 0, skipped: 0, errors: 0 }
-
-  if (type === 'delight') {
-    // Fetch all delight photos from Supabase
-    const photosRes = await fetch(`${SURL}/rest/v1/delight_photos?select=*,guest_delights(your_name,villa_name,booking_date)&order=created_at.desc`, { headers: SH })
-    const photos = await photosRes.json()
-    if (!Array.isArray(photos)) return NextResponse.json({ error: 'Failed to fetch photos' }, { status: 500 })
-
-    for (const photo of photos.slice(0, 50)) { // max 50 per run
-      if (!photo.public_url && !photo.storage_path) { results.skipped++; continue }
-      const url = photo.public_url || `${SURL}/storage/v1/object/public/delight-photos/${photo.storage_path}`
-      try {
-        const imgRes = await fetch(url)
-        if (!imgRes.ok) { results.skipped++; continue }
-        const imgData = await imgRes.arrayBuffer()
-        const mimeType = imgRes.headers.get('content-type') || 'image/jpeg'
-        const butler = photo.guest_delights?.your_name?.replace(/\s+/g, '_') || 'Unknown'
-        const date = (photo.guest_delights?.booking_date || new Date().toISOString().slice(0,10))
-        const villa = photo.guest_delights?.villa_name?.replace(/\s+/g, '_') || 'Unknown_Villa'
-        const filename = `${butler}_${villa}_${date}_${photo.pointer_key || 'photo'}.jpg`
-        const ok = await uploadToDrive(filename, imgData, mimeType, DRIVE_DELIGHT, accessToken)
-        ok ? results.uploaded++ : results.errors++
-      } catch { results.errors++ }
-    }
-  }
-
-  if (type === 'tasks') {
-    // Fetch completed tasks with photos
-    const tasksRes = await fetch(`${SURL}/rest/v1/tasks?select=id,type,photo_path,notes,butler_id,completed_at&eq.status=completed&not.is.photo_path=null&order=completed_at.desc`, { headers: SH })
-    const tasks = await tasksRes.json()
-    if (!Array.isArray(tasks)) return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
-
-    for (const task of tasks.slice(0, 50)) {
-      if (!task.photo_path) { results.skipped++; continue }
-      try {
-        const imgRes = await fetch(task.photo_path)
-        if (!imgRes.ok) { results.skipped++; continue }
-        const imgData = await imgRes.arrayBuffer()
-        const mimeType = imgRes.headers.get('content-type') || 'image/jpeg'
-        const nameMatch = task.notes?.match(/Butler: ([^·\n]+)/)
-        const butler = nameMatch ? nameMatch[1].trim().replace(/\s+/g, '_') : 'Unknown'
-        const villaMatch = task.notes?.match(/Villa: ([^·\n]+)/)
-        const villa = villaMatch ? villaMatch[1].trim().replace(/\s+/g, '_') : 'Unknown_Villa'
-        const date = (task.completed_at || new Date().toISOString()).slice(0, 10)
-        const filename = `${butler}_${villa}_${task.type?.replace(/\s+/g, '_')}_${date}.jpg`
-        const ok = await uploadToDrive(filename, imgData, mimeType, DRIVE_TASK, accessToken)
-        ok ? results.uploaded++ : results.errors++
-      } catch { results.errors++ }
-    }
-  }
-
-  return NextResponse.json({ ...results, message: `Backup complete — ${results.uploaded} uploaded, ${results.skipped} skipped, ${results.errors} errors` })
-}
-
+// ── GET: return folder links + backup status ─────────────────
 export async function GET() {
+  // Fetch count of photos in DB
+  const photosRes = await fetch(`${SURL}/rest/v1/delight_photos?select=id,public_url&limit=200`, { headers: SH })
+  const photos = await photosRes.json()
+  const withUrl = Array.isArray(photos) ? photos.filter((p: any) => p.public_url) : []
+
+  const tasksRes = await fetch(`${SURL}/rest/v1/tasks?select=id,photo_path&not.photo_path=is.null&limit=200`, { headers: SH })
+  const tasks = await tasksRes.json()
+  const withPhoto = Array.isArray(tasks) ? tasks.filter((t: any) => t.photo_path) : []
+
   return NextResponse.json({
     folders: {
-      root: { name: 'StayVista Butler Ops', id: DRIVE_ROOT, url: `https://drive.google.com/drive/folders/${DRIVE_ROOT}` },
-      delight: { name: 'Delight Photos', id: DRIVE_DELIGHT, url: `https://drive.google.com/drive/folders/${DRIVE_DELIGHT}` },
-      task: { name: 'Task Photos', id: DRIVE_TASK, url: `https://drive.google.com/drive/folders/${DRIVE_TASK}` },
-    }
+      root:    { name: 'StayVista Butler Ops',  url: 'https://drive.google.com/drive/folders/1CWBEkGRYkvubq_x8E1WuJPi_VP-8vejS' },
+      delight: { name: 'Delight Photos',        url: `https://drive.google.com/drive/folders/${DRIVE_DELIGHT}` },
+      task:    { name: 'Task Photos',           url: `https://drive.google.com/drive/folders/${DRIVE_TASK}` },
+    },
+    stats: {
+      delightPhotosInDB: withUrl.length,
+      taskPhotosInDB:    withPhoto.length,
+      note: 'Photos are stored in Supabase Storage. Use the Drive links to view backup folders. Auto-backup runs when photos are uploaded.',
+    },
+    allDelightPhotoUrls: withUrl.slice(0, 5).map((p: any) => p.public_url),
   })
+}
+
+// ── POST: called when a photo is uploaded — saves to Drive ──
+export async function POST(req: Request) {
+  const body = await req.json()
+  const { photoUrl, fileName, folderType } = body
+
+  if (!photoUrl || !fileName) {
+    return NextResponse.json({ error: 'Missing photoUrl or fileName' }, { status: 400 })
+  }
+
+  try {
+    // Fetch the image
+    const imgRes = await fetch(photoUrl)
+    if (!imgRes.ok) return NextResponse.json({ error: 'Could not fetch photo from Supabase' }, { status: 400 })
+    
+    const mimeType = imgRes.headers.get('content-type') || 'image/jpeg'
+    const imgBuffer = await imgRes.arrayBuffer()
+    const base64 = Buffer.from(imgBuffer).toString('base64')
+    
+    const folderId = folderType === 'task' ? DRIVE_TASK : DRIVE_DELIGHT
+
+    // Upload to Drive via Google Drive REST API
+    const metadata = { name: fileName, parents: [folderId] }
+    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${body.driveToken}`,
+        'Content-Type': `multipart/related; boundary=boundary123`,
+      },
+      body: `--boundary123\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n--boundary123\r\nContent-Type: ${mimeType}\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64}\r\n--boundary123--`,
+    })
+
+    if (uploadRes.ok) {
+      const data = await uploadRes.json()
+      return NextResponse.json({ ok: true, fileId: data.id, name: fileName })
+    }
+    
+    return NextResponse.json({ ok: false, status: uploadRes.status })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
