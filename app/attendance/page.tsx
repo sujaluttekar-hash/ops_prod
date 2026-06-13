@@ -12,6 +12,39 @@ const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }
   half_day: { bg: 'rgba(254,213,169,0.2)', color: '#7A4A08', label: 'Half day' },
 };
 
+
+// ── Week Calendar ─────────────────────────────────────────────
+function WeekCalendar({ currentDate, onSelectDate }: { currentDate: string; onSelectDate: (d: string) => void }) {
+  const d = new Date(currentDate);
+  const day = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const dd = new Date(monday);
+    dd.setDate(monday.getDate() + i);
+    return dd;
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  return (
+    <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
+      {days.map((dd, idx) => {
+        const iso = dd.toISOString().slice(0, 10);
+        const isToday = iso === today;
+        const isSelected = iso === currentDate;
+        return (
+          <button key={iso} onClick={() => onSelectDate(iso)}
+            style={{ flex: 1, padding: '8px 4px', borderRadius: 10, border: `1.5px solid ${isSelected ? '#1B1D1F' : isToday ? '#9CCCFC' : 'rgba(0,0,0,0.1)'}`, background: isSelected ? '#1B1D1F' : isToday ? 'rgba(156,204,252,0.1)' : '#fff', cursor: 'pointer', textAlign: 'center', transition: 'all 0.12s' }}>
+            <div style={{ fontSize: 9.5, fontWeight: 600, color: isSelected ? '#9CCCFC' : 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{dayNames[idx]}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: isSelected ? '#fff' : isToday ? '#0C447C' : '#1B1D1F', marginTop: 2 }}>{dd.getDate()}</div>
+            <div style={{ fontSize: 9, color: isSelected ? 'rgba(255,255,255,0.5)' : 'var(--muted-fg)', marginTop: 1 }}>{dd.toLocaleDateString('en-GB', { month: 'short' })}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AttendancePage() {
   const { user } = useAuth();
   const [records, setRecords] = useState<any[]>([]);
@@ -56,10 +89,12 @@ export default function AttendancePage() {
     setMarkingId(butlerId);
     const now = new Date().toTimeString().slice(0, 5);
 
-    // Get GPS — only for present/half_day
+    // Get GPS — ONLY for butler marking themselves present, never for admin
     let geo_lat: number | null = null;
     let geo_lng: number | null = null;
-    if (status !== 'absent') {
+    const localSession = (() => { try { return JSON.parse(localStorage.getItem('sv_local_session') || '{}'); } catch { return {}; } })();
+    const isButlerMarkingSelf = localSession.role === 'butler' && localSession.id === butlerId;
+    if (status !== 'absent' && isButlerMarkingSelf) {
       const pos = await getCurrentPosition();
       if (pos) { geo_lat = pos.lat; geo_lng = pos.lng; }
     }
@@ -70,12 +105,12 @@ export default function AttendancePage() {
       geo_lat, geo_lng,
     }, { onConflict: 'date,butler_id' });
 
-    // If the butler is marking themselves present, also update their live location on the map
+    // Only push to map if butler marked themselves
     try {
       const stored = localStorage.getItem('sv_local_session');
-      if (stored && status !== 'absent') {
+      if (stored && status !== 'absent' && isButlerMarkingSelf) {
         const u = JSON.parse(stored);
-        if (u.id === butlerId && geo_lat && geo_lng) {
+        if (geo_lat && geo_lng) {
           await fetch('/api/location', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -109,6 +144,7 @@ export default function AttendancePage() {
       />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
+        <WeekCalendar currentDate={date} onSelectDate={setDate} />
         {isSuper && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 20 }}>
             {[{ l: 'Present', v: present, c: 'green' }, { l: 'Absent', v: absent, c: 'coral' }, { l: 'Half day', v: half, c: 'peach' }, { l: 'Total', v: records.length, c: 'blue' }].map(s => (
@@ -144,7 +180,10 @@ export default function AttendancePage() {
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div className="sv-avatar" style={{ width: 28, height: 28, fontSize: 10 }}>{r.name.slice(0,2).toUpperCase()}</div>
-                            <span style={{ fontWeight: 500, fontSize: 13 }}>{r.name}</span>
+                            <div>
+                              <span style={{ fontWeight: 500, fontSize: 13 }}>{r.name}</span>
+                              {r.tasks_total === 0 && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(0,0,0,0.07)', color: 'var(--muted-fg)' }}>No tasks</span>}
+                            </div>
                           </div>
                         </td>
                         {isSuper && <td style={{ fontSize: 12, color: 'var(--muted-fg)' }}>{r.squad}</td>}

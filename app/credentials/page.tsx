@@ -145,6 +145,14 @@ export default function CredentialsPage() {
 
   useEffect(() => { load(); }, []);
 
+  async function toggleActive(email: string, currentStatus: boolean) {
+    const db = dbProfiles.find(p => p.email === email);
+    if (!db) { alert('Profile not found in DB.'); return; }
+    const { error } = await getServiceSupabase().from('profiles').update({ is_active: !currentStatus }).eq('id', db.id);
+    if (error) { alert('Error: ' + error.message); return; }
+    await load();
+  }
+
   function copy(key: string, val: string) {
     navigator.clipboard.writeText(val).catch(() => {});
     setCopied(key);
@@ -235,11 +243,13 @@ export default function CredentialsPage() {
                         <td><span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 20, background: rc.bg, color: rc.color }}>{rc.label}</span></td>
                         <td style={{ fontSize: 12, color: 'var(--muted-fg)' }}>{a.squad || '—'}</td>
                         <td>
-                          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 20,
-                            background: a.is_active ? 'rgba(151,196,89,0.12)' : 'rgba(233,160,167,0.12)',
-                            color: a.is_active ? '#2D5A0E' : '#8B2020' }}>
-                            {a.is_active ? 'Active' : 'Inactive'}
-                          </span>
+                          <button
+                            onClick={() => toggleActive(a.email, a.is_active)}
+                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                              background: a.is_active ? 'rgba(151,196,89,0.15)' : 'rgba(233,160,167,0.15)',
+                              color: a.is_active ? '#2D5A0E' : '#8B2020' }}>
+                            {a.is_active ? '✅ Active' : '❌ Inactive'}
+                          </button>
                         </td>
                       </tr>
                     );

@@ -373,7 +373,10 @@ function UtilizationPanel({ allocations }: { allocations: ButlerAllocation[] }) 
               <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #9CCCFC, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                 {a.name.slice(0,2).toUpperCase()}
               </div>
-              <div style={{ width: 100, fontSize: 12, fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, width: 140, flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</span>
+                {a.totalTasks === 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(0,0,0,0.07)', color: 'var(--muted-fg)', whiteSpace: 'nowrap', flexShrink: 0 }}>No tasks</span>}
+              </div>
               <div style={{ flex: 1, position: 'relative' }}>
                 <div style={{ height: 7, borderRadius: 4, background: 'rgba(0,0,0,0.07)', overflow: 'hidden' }}>
                   <div style={{
@@ -421,6 +424,43 @@ function UtilizationPanel({ allocations }: { allocations: ButlerAllocation[] }) 
 }
 
 // ─── Main page ────────────────────────────────────────────────
+
+// ── Week Calendar ─────────────────────────────────────────────
+function WeekCalendar({ currentDate, onSelectDate }: { currentDate: string; onSelectDate: (d: string) => void }) {
+  const d = new Date(currentDate);
+  // Get Monday of current week
+  const day = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const dd = new Date(monday);
+    dd.setDate(monday.getDate() + i);
+    return dd;
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
+      {days.map(dd => {
+        const iso = dd.toISOString().slice(0, 10);
+        const isToday = iso === today;
+        const isSelected = iso === currentDate;
+        const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+        return (
+          <button key={iso} onClick={() => onSelectDate(iso)}
+            style={{ flex: 1, padding: '8px 4px', borderRadius: 10, border: `1.5px solid ${isSelected ? '#1B1D1F' : isToday ? '#9CCCFC' : 'rgba(0,0,0,0.1)'}`, background: isSelected ? '#1B1D1F' : isToday ? 'rgba(156,204,252,0.1)' : '#fff', cursor: 'pointer', textAlign: 'center', transition: 'all 0.12s' }}>
+            <div style={{ fontSize: 9.5, fontWeight: 600, color: isSelected ? '#9CCCFC' : 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{dayNames[days.indexOf(dd)]}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: isSelected ? '#fff' : isToday ? '#0C447C' : '#1B1D1F', marginTop: 2 }}>{dd.getDate()}</div>
+            <div style={{ fontSize: 9, color: isSelected ? 'rgba(255,255,255,0.5)' : 'var(--muted-fg)', marginTop: 1 }}>{dd.toLocaleDateString('en-GB', { month: 'short' })}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AllocationPage() {
   const { user } = useAuth();
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -515,6 +555,7 @@ export default function AllocationPage() {
 
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
+        <WeekCalendar currentDate={date} onSelectDate={setDate} />
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap', alignItems: 'flex-end' }}>

@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 export type LocationStatus = 'idle' | 'requesting' | 'active' | 'denied' | 'unsupported';
 
 export function useButlerLocation(user: { id: string; name: string; squad?: string | null; role: string } | null) {
-  // GUARD: if user is null or not a butler, return immediately — no geolocation calls
-  const isButler = user?.role === 'butler';
   const [status, setStatus] = useState<LocationStatus>('idle');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startedRef = useRef(false);
@@ -21,7 +19,7 @@ export function useButlerLocation(user: { id: string; name: string; squad?: stri
   }
 
   function startTracking(u: any) {
-    if (!u || u.role !== 'butler') return; // never track non-butlers
+    if (!u || u.role !== 'butler') return; // NEVER track admins
     if (startedRef.current) return;
     if (!navigator?.geolocation) { setStatus('unsupported'); return; }
     startedRef.current = true;
@@ -37,7 +35,7 @@ export function useButlerLocation(user: { id: string; name: string; squad?: stri
           navigator.geolocation.getCurrentPosition(
             (p) => saveLocation(p.coords.latitude, p.coords.longitude, p.coords.accuracy, u),
             () => {},
-            { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 }
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 20000 }
           );
         }, 30000);
       },
@@ -45,30 +43,31 @@ export function useButlerLocation(user: { id: string; name: string; squad?: stri
         startedRef.current = false;
         setStatus(err.code === 1 ? 'denied' : 'idle');
       },
-      { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 30000 }
     );
   }
 
   useEffect(() => {
-    // ONLY run for butlers — hard gate before any geolocation call
+    // ONLY run for butlers — read from localStorage directly for reliability
     try {
       const stored = localStorage.getItem('sv_local_session');
       if (!stored) return;
       const u = JSON.parse(stored);
-      // Strict role check — never ask non-butlers for location
-      if (!u || u.role !== 'butler') return;
+      if (!u || u.role !== 'butler') return; // hard gate for admins
       const t = setTimeout(() => startTracking(u), 1500);
       return () => clearTimeout(t);
     } catch {}
   }, []);
 
-  // Also trigger when auth context resolves — but only for butlers
+  // Also trigger when auth prop is set (later)
   useEffect(() => {
-    if (!user) return;
-    if (user.role !== 'butler') return; // NEVER track admin/supervisor
-    if (startedRef.current) return;
+    if (!user || user.role !== 'butler' || startedRef.current) return;
     startTracking(user);
   }, [user?.id, user?.role]);
+
+  useEffect(() => {
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
 
   return { status };
 }
