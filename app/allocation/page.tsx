@@ -100,15 +100,27 @@ export default function AllocationPage() {
     const startDate = `${reportYear}-${String(reportMonth + 1).padStart(2,'0')}-01`;
     const endDate = `${reportYear}-${String(reportMonth + 1).padStart(2,'0')}-31`;
 
-    const [butlerRes, tasksRes] = await Promise.all([
-      sb.from('profiles').select('id,name,squad,role').eq('role','butler').eq('is_active',true).order('name'),
-      sb.from('tasks').select('id,type,butler_id,notes,created_at,status')
-        .gte('created_at', `${startDate}T00:00:00`)
-        .lte('created_at', `${endDate}T23:59:59`),
-    ]);
+    try {
+      // Use server API for tasks — guaranteed to work
+      const [butlerRes, tasksRes] = await Promise.all([
+        sb.from('profiles').select('id,name,squad,role').eq('role','butler').eq('is_active',true).order('name'),
+        fetch(`/api/tasks?all=1`, { cache: 'no-store' }).then(r => r.json()),
+      ]);
 
-    setMonthlyButlers(butlerRes.data || []);
-    setMonthlyData(tasksRes.data || []);
+      const allTasks = Array.isArray(tasksRes) ? tasksRes : [];
+      // Filter to this month — check both created_at and notes Date: field
+      const monthTasks = allTasks.filter((t: any) => {
+        const dateFromNotes = t.notes?.match(/Date: (\d{4}-\d{2}-\d{2})/)?.[1];
+        const dateFromCreated = (t.created_at || '').slice(0, 10);
+        const d = dateFromNotes || dateFromCreated;
+        return d >= startDate && d <= endDate;
+      });
+
+      setMonthlyButlers(butlerRes.data || []);
+      setMonthlyData(monthTasks);
+    } catch (e) {
+      console.error('loadMonthly error:', e);
+    }
     setMonthlyLoading(false);
   }
 
