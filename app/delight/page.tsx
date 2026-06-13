@@ -296,6 +296,22 @@ export default function DelightPage() {
   const [filterType, setFilterType] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [user, setUser] = useState<AppUser | null>(null);
+  const [backing, setBacking] = useState(false);
+  const [backupMsg, setBackupMsg] = useState('');
+
+  async function backupToDrive() {
+    setBacking(true); setBackupMsg('');
+    try {
+      const res = await fetch('/api/drive-backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'delight', accessToken: 'via-mcp' }),
+      });
+      const data = await res.json();
+      setBackupMsg(data.message || 'Backup done');
+    } catch { setBackupMsg('Backup failed'); }
+    setBacking(false);
+  }
 
   async function load() {
     setLoading(true);
