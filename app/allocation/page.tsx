@@ -104,8 +104,7 @@ export default function AllocationPage() {
       sb.from('profiles').select('id,name,squad,role').eq('role','butler').eq('is_active',true).order('name'),
       sb.from('tasks').select('id,type,butler_id,notes,created_at,status')
         .gte('created_at', `${startDate}T00:00:00`)
-        .lte('created_at', `${endDate}T23:59:59`)
-        .in('type', ['Check-In','Check-Out','Booking','Non Booking']),
+        .lte('created_at', `${endDate}T23:59:59`),
     ]);
 
     setMonthlyButlers(butlerRes.data || []);
@@ -129,8 +128,8 @@ export default function AllocationPage() {
         type: bType,
         butler_id: butler.id,
         status: 'pending',
-        notes: `Butler: ${butler.name} · ButlerID: ${butler.id}`,
-        created_at: `${date}T08:00:00`,
+        notes: `Butler: ${butler.name} · ButlerID: ${butler.id} · Date: ${date}`,
+        created_at: `${date}T08:00:00+05:30`,
       });
 
       if (!error) {
@@ -160,8 +159,8 @@ export default function AllocationPage() {
       type: bType,
       butler_id: butler.id,
       status: 'pending',
-      notes: `Butler: ${butler.name} · ButlerID: ${butler.id}`,
-      created_at: `${date}T08:00:00`,
+      notes: `Butler: ${butler.name} · ButlerID: ${butler.id} · Date: ${date}`,
+      created_at: `${date}T08:00:00+05:30`,
     });
     if (!error) {
       try {
@@ -328,13 +327,19 @@ function MonthlyReport({ butlers, tasks, month, year, loading }: { butlers: any[
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const today = new Date();
 
-  // Build lookup: butlerId → date → booking type
+  // Build lookup: butlerId → date → booking type (only roster types)
+  const ROSTER_TYPES = new Set(['Check-In','Check-Out','Booking','Non Booking']);
   const lookup: Record<string, Record<string, string>> = {};
   tasks.forEach((t: any) => {
-    const d = (t.created_at || '').slice(0, 10);
+    if (!ROSTER_TYPES.has(t.type)) return; // skip task types like Arrival selfie etc
+    // Extract date from notes "Date: YYYY-MM-DD" if present, else from created_at
+    const dateFromNotes = t.notes?.match(/Date: (\d{4}-\d{2}-\d{2})/)?.[1];
+    const raw = t.created_at || '';
+    const d = dateFromNotes || raw.slice(0, 10);
     if (!d || !t.butler_id) return;
     if (!lookup[t.butler_id]) lookup[t.butler_id] = {};
-    lookup[t.butler_id][d] = t.type;
+    // Only set if not already set (keep first/most recent)
+    if (!lookup[t.butler_id][d]) lookup[t.butler_id][d] = t.type;
   });
 
   // Summary counts per butler for the month
