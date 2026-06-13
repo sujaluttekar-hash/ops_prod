@@ -28,33 +28,60 @@ export default function LoginPage() {
     setLoading(true)
 
     const key = email.toLowerCase().trim()
+
+    // 1. Check hardcoded USERS first (fast, no network)
     const match = USERS[key]
-
-    if (!match) {
-      setError('No account found for this email.')
-      setLoading(false)
+    if (match) {
+      if (match.password !== password) {
+        setError('Incorrect password.')
+        setLoading(false)
+        return
+      }
+      localStorage.setItem('sv_local_session', JSON.stringify({
+        id: match.id, name: match.name, email: key,
+        role: match.role, squad: match.squad,
+        property_id: null, phone: null, is_active: true,
+        created_at: new Date().toISOString(), updated_at: null,
+      }))
+      window.location.replace('/dashboard')
       return
     }
-    if (match.password !== password) {
-      setError('Incorrect password.')
+
+    // 2. Not in hardcoded list — check Supabase profiles table (for newly added users)
+    try {
+      const res = await fetch(
+        `https://ryuxwnbrdsjwzwdimynd.supabase.co/rest/v1/profiles?email=eq.${encodeURIComponent(key)}&is_active=eq.true&select=id,name,email,role,squad,password_hash`,
+        {
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA',
+          }
+        }
+      )
+      const users = await res.json()
+      if (!Array.isArray(users) || users.length === 0) {
+        setError('No account found for this email.')
+        setLoading(false)
+        return
+      }
+      const dbUser = users[0]
+      // Check password (stored as plain text in password_hash column for local auth)
+      if (dbUser.password_hash !== password) {
+        setError('Incorrect password.')
+        setLoading(false)
+        return
+      }
+      localStorage.setItem('sv_local_session', JSON.stringify({
+        id: dbUser.id, name: dbUser.name, email: key,
+        role: dbUser.role, squad: dbUser.squad,
+        property_id: null, phone: null, is_active: true,
+        created_at: new Date().toISOString(), updated_at: null,
+      }))
+      window.location.replace('/dashboard')
+    } catch {
+      setError('Login failed. Please try again.')
       setLoading(false)
-      return
     }
-
-    localStorage.setItem('sv_local_session', JSON.stringify({
-      id: match.id,
-      name: match.name,
-      email: key,
-      role: match.role,
-      squad: match.squad,
-      property_id: null,
-      phone: null,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: null,
-    }))
-
-    window.location.replace('/dashboard')
   }
 
   return (

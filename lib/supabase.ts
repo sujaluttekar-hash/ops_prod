@@ -306,8 +306,13 @@ export async function uploadDelightPhoto(delightId: string, pointerKey: string, 
 }
 
 export async function uploadTaskPhoto(file: File, submissionId: string): Promise<string | null> {
-  const path = `${submissionId}/${Date.now()}.${file.name.split('.').pop()}`
-  const { error, publicUrl } = await uploadPhoto(BUCKETS.taskPhotos, file, path)
-  if (error) return null
-  return publicUrl
+  // Use delight-photos bucket as fallback if task-photos doesn't exist
+  const path = `tasks/${submissionId}/${Date.now()}.${file.name.split('.').pop()}`
+  let result = await uploadPhoto(BUCKETS.taskPhotos, file, path)
+  if (result.error) {
+    // Fallback to delight-photos bucket
+    result = await uploadPhoto(BUCKETS.delightPhotos, file, path)
+  }
+  if (result.error) { console.error('Photo upload failed:', result.error); return null }
+  return result.publicUrl
 }

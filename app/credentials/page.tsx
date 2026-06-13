@@ -37,9 +37,9 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     setSaving(true);
     setError('');
 
-    // Generate a UUID for this user
     const uuid = crypto.randomUUID();
 
+    // Save to profiles with password_hash so login can auth them
     const { error: err } = await getServiceSupabase().from('profiles').insert({
       id: uuid,
       name: form.name,
@@ -47,12 +47,12 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       role: form.role,
       squad: form.squad || null,
       is_active: true,
+      password_hash: form.password,  // plain text for local auth
       created_at: new Date().toISOString(),
     });
 
     if (err) { setError(err.message); setSaving(false); return; }
 
-    // Also update the login page USERS list — note to user
     setSaving(false);
     onSaved();
     onClose();
@@ -105,14 +105,9 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           </button>
         </div>
 
-        {form.email && form.password && (
-          <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(156,204,252,0.1)', borderRadius: 8, fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>📋 Add this line to app/login/page.tsx USERS object:</div>
-            <code style={{ fontSize: 10, display: 'block', background: 'rgba(0,0,0,0.05)', padding: '6px 8px', borderRadius: 5, wordBreak: 'break-all' }}>
-              {`'${form.email}': { id: '<UUID>', password: '${form.password}', role: '${form.role}', name: '${form.name}', squad: '${form.squad || null}' },`}
-            </code>
-          </div>
-        )}
+        <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(151,196,89,0.08)', borderRadius: 8, fontSize: 11, color: '#2D5A0E', lineHeight: 1.5 }}>
+          ✅ User will be saved to the database and can log in immediately with the email and password above.
+        </div>
       </div>
     </div>
   );

@@ -7,47 +7,33 @@ const H = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}`, 'Content-Type': 'ap
 export async function GET() {
   const results: any = {}
 
-  // 1. Check if butler_locations table exists
-  const checkRes = await fetch(`${SURL}/rest/v1/butler_locations?limit=1`, {
-    headers: { 'apikey': SVC, 'Authorization': `Bearer ${SVC}` }
-  })
-  results.butler_locations_exists = checkRes.ok ? '✅ EXISTS' : `❌ MISSING (${checkRes.status})`
+  // 1. Check butler_locations table
+  const locRes = await fetch(`${SURL}/rest/v1/butler_locations?limit=1`, { headers: H })
+  results.butler_locations = locRes.ok ? '✅ EXISTS' : `❌ MISSING`
 
   // 2. Check attendance table
-  const attRes = await fetch(`${SURL}/rest/v1/attendance?limit=1`, {
-    headers: { 'apikey': SVC, 'Authorization': `Bearer ${SVC}` }
-  })
-  results.attendance_exists = attRes.ok ? '✅ EXISTS' : `❌ MISSING (${attRes.status})`
+  const attRes = await fetch(`${SURL}/rest/v1/attendance?limit=1`, { headers: H })
+  results.attendance = attRes.ok ? '✅ EXISTS' : `❌ MISSING`
 
-  // 3. Try inserting a test location (Lonavala center)
-  if (checkRes.ok) {
-    const testInsert = await fetch(`${SURL}/rest/v1/butler_locations`, {
-      method: 'POST',
-      headers: { ...H, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({
-        butler_id: '24e03c68-5cd0-47aa-a695-75850ac2a81d',
-        butler_name: 'Test Butler',
-        squad: 'Lonavala',
-        lat: 18.754,
-        lng: 73.405,
-        accuracy: 10,
-        updated_at: new Date().toISOString()
-      })
-    })
-    results.test_insert = testInsert.ok ? '✅ Insert works' : `❌ Insert failed (${testInsert.status}: ${await testInsert.text()})`
-  }
+  // 3. Check profiles has password_hash column by inserting test check
+  const profRes = await fetch(`${SURL}/rest/v1/profiles?select=id,password_hash&limit=1`, { headers: H })
+  const profData = await profRes.json()
+  results.password_hash_column = profRes.ok && !profData?.code ? '✅ EXISTS' : `❌ MISSING — run: ALTER TABLE profiles ADD COLUMN IF NOT EXISTS password_hash TEXT;`
 
-  // 4. Read all locations
-  if (checkRes.ok) {
-    const locsRes = await fetch(`${SURL}/rest/v1/butler_locations?select=*`, {
-      headers: { 'apikey': SVC, 'Authorization': `Bearer ${SVC}` }
-    })
-    const locs = await locsRes.json()
-    results.locations_count = Array.isArray(locs) ? locs.length : 'error'
-    results.locations = Array.isArray(locs) ? locs : locs
-  }
+  // 4. List storage buckets
+  const bucketsRes = await fetch(`${SURL}/storage/v1/bucket`, { headers: H })
+  const buckets = await bucketsRes.json()
+  results.storage_buckets = Array.isArray(buckets) ? buckets.map((b: any) => b.name) : buckets
 
-  results.sql_to_run = `-- Run this in Supabase SQL Editor if tables are missing:
+  // 5. Count task photos
+  const tasksRes = await fetch(`${SURL}/rest/v1/tasks?select=id,photo_path&not.photo_path=is.null&limit=10`, { headers: H })
+  const tasks = await tasksRes.json()
+  results.tasks_with_photos = Array.isArray(tasks) ? tasks.length : 0
+  results.sample_photo_url = Array.isArray(tasks) && tasks[0] ? tasks[0].photo_path : null
+
+  results.sql_needed = `-- Run ALL of this in Supabase SQL Editor:
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
 CREATE TABLE IF NOT EXISTS butler_locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   butler_id UUID NOT NULL,
@@ -65,13 +51,14 @@ CREATE TABLE IF NOT EXISTS attendance (
   date DATE NOT NULL,
   butler_id UUID NOT NULL,
   status TEXT NOT NULL DEFAULT 'absent',
-  check_in TEXT,
-  check_out TEXT,
-  geo_lat DOUBLE PRECISION,
-  geo_lng DOUBLE PRECISION,
+  check_in TEXT, check_out TEXT,
+  geo_lat DOUBLE PRECISION, geo_lng DOUBLE PRECISION,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS attendance_date_butler_idx ON attendance(date, butler_id);`
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_date_butler_idx ON attendance(date, butler_id);
+
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS geo_lat DOUBLE PRECISION;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS geo_lng DOUBLE PRECISION;`
 
   return NextResponse.json(results)
 }
