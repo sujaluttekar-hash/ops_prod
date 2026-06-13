@@ -12,9 +12,7 @@ type HuddleWithStats = Huddle & { attendanceCount?: number; hasQuiz?: boolean; q
 
 // ── Schedule Modal (admin/supervisor) ────────────────────────
 function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [step, setStep] = useState<'details' | 'quiz'>('details');
-  const [form, setForm] = useState({ team: '', huddle_date: '', time: '', participants_expected: '', notes: '', meet_link: '', status: 'scheduled' });
-  const [addQuiz, setAddQuiz] = useState(false);
+  const [form, setForm] = useState({ team: '', huddle_date: '', time: '', participants_expected: '', notes: '', status: 'scheduled' });
   const [questions, setQuestions] = useState<QuizQuestion[]>([{ question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'a' }]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -46,20 +44,12 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         time: form.time || null,
         participants_expected: parseInt(form.participants_expected) || 0,
         notes: form.notes || null,
-        meet_link: form.meet_link || null,
         status: form.status,
       }).select().single();
       if (hErr) throw new Error(hErr.message);
 
       // Insert quiz questions if enabled
-      if (addQuiz && huddle) {
-        const validQs = questions.filter(q => q.question.trim() && q.option_a && q.option_b && q.option_c && q.option_d);
-        if (validQs.length > 0) {
-          await sb.from('huddle_quiz_questions').insert(
-            validQs.map((q, i) => ({ ...q, huddle_id: huddle.id, order_no: i + 1 }))
-          );
-        }
-      }
+
 
       // Send notifications to all butlers
       const { data: butlers } = await sb.from('profiles').select('id').eq('role', 'butler').eq('is_active', true);
@@ -68,7 +58,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
           butlers.map((b: any) => ({
             user_id: b.id,
             title: `Huddle scheduled: ${form.team}`,
-            body: `Scheduled for ${new Date(form.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${form.time ? ' at ' + form.time.slice(0,5) : ''}${addQuiz ? ' · Quiz included' : ''}`,
+            body: `Scheduled for ${new Date(form.huddle_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${form.time ? ' at ' + form.time.slice(0,5) : ''}`,
             type: 'huddle',
             read: false,
           }))
@@ -87,7 +77,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
           <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Schedule huddle</div>
             <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>
-              {step === 'details' ? 'Step 1: Huddle details' : 'Step 2: Add quiz questions'}
+              Schedule huddle
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
@@ -98,14 +88,11 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
           <div style={{ textAlign: 'center', padding: '32px 0' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Huddle scheduled!</div>
-            <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginTop: 4 }}>Butlers have been notified{addQuiz ? ' · Quiz added' : ''}.</div>
+            <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginTop: 4 }}>Butlers have been notified.</div>
           </div>
         ) : (
           <form onSubmit={handleSave}>
             {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
-
-            {step === 'details' && (
-              <>
                 <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
                   <div>
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Team / huddle name *</div>
@@ -138,10 +125,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Notes / agenda</div>
                     <textarea className="sv-input" style={{ width: '100%', minHeight: 60, resize: 'vertical' }} placeholder="What will be covered?" value={form.notes} onChange={f('notes')} />
                   </div>
-                  <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Google Meet / Video link (optional)</div>
-                    <input className="sv-input" style={{ width: '100%' }} placeholder="https://meet.google.com/xxx-xxxx-xxx" value={form.meet_link} onChange={f('meet_link')} />
-                  </div>
+
 
 
                 </div>
@@ -150,59 +134,9 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
                   <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
                   <button type="submit" className="sv-btn sv-btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Schedule huddle'}</button>
                 </div>
-              </>
-            )}
+              
 
-            {step === 'quiz' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, color: 'var(--muted-fg)' }}>{questions.length}/10 questions added</div>
-                  <button type="button" className="sv-btn" style={{ fontSize: 12 }} onClick={() => setStep('details')}>← Back</button>
-                </div>
-
-                {questions.map((q, i) => (
-                  <div key={i} style={{ background: 'var(--muted)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted-fg)' }}>Question {i + 1}</div>
-                      {questions.length > 1 && <button type="button" onClick={() => removeQuestion(i)} style={{ background: 'none', border: 'none', fontSize: 12, color: '#8B2020', cursor: 'pointer' }}>Remove</button>}
-                    </div>
-                    <input className="sv-input" style={{ width: '100%', marginBottom: 8, background: '#fff' }} placeholder="Enter question" value={q.question} onChange={e => updateQ(i, 'question', e.target.value)} required={addQuiz} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-                      {(['a','b','c','d'] as const).map(opt => (
-                        <div key={opt} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, width: 16, color: q.correct_option === opt ? '#2D5A0E' : 'var(--muted-fg)', flexShrink: 0 }}>{opt.toUpperCase()}</div>
-                          <input className="sv-input" style={{ flex: 1, fontSize: 12, background: '#fff', border: `1px solid ${q.correct_option === opt ? '#97C459' : 'rgba(0,0,0,0.12)'}` }}
-                            placeholder={`Option ${opt.toUpperCase()}`}
-                            value={(q as any)[`option_${opt}`]}
-                            onChange={e => updateQ(i, `option_${opt}` as any, e.target.value)} required={addQuiz} />
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)' }}>Correct answer:</div>
-                      {(['a','b','c','d'] as const).map(opt => (
-                        <button key={opt} type="button"
-                          onClick={() => updateQ(i, 'correct_option', opt)}
-                          style={{ padding: '3px 10px', borderRadius: 6, border: `1.5px solid ${q.correct_option === opt ? '#97C459' : 'rgba(0,0,0,0.12)'}`, background: q.correct_option === opt ? 'rgba(151,196,89,0.15)' : 'white', fontSize: 12, fontWeight: 700, color: q.correct_option === opt ? '#2D5A0E' : 'var(--muted-fg)', cursor: 'pointer' }}>
-                          {opt.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                {questions.length < 10 && (
-                  <button type="button" className="sv-btn" style={{ width: '100%', justifyContent: 'center', marginBottom: 14, fontSize: 12 }} onClick={addQuestion}>
-                    + Add question ({questions.length}/10)
-                  </button>
-                )}
-
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
-                  <button type="submit" className="sv-btn sv-btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Schedule with quiz'}</button>
-                </div>
-              </>
-            )}
+            
           </form>
         )}
       </div>
@@ -616,11 +550,7 @@ export default function HuddlePage() {
                           </div>
                           {h.hasQuiz && <div style={{ fontSize: 11, marginTop: 3 }}><span className="badge badge-blue">Quiz: {h.questionCount}q</span></div>}
                           {h.notes && <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4, fontStyle: 'italic' }}>{h.notes}</div>}
-                          {(h as any).meet_link && (
-                            <a href={(h as any).meet_link} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#1a73e8', fontWeight: 600, marginTop: 6, background: 'rgba(26,115,232,0.08)', padding: '4px 10px', borderRadius: 6 }}>
-                              📹 Join Google Meet
-                            </a>
-                          )}
+
                           <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <span className={getStatusBadge(h.status)}>{getStatusLabel(h.status)}</span>
                             {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => setAttendanceHuddle(h)}>Mark attendance</button>}
