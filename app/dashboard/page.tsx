@@ -48,11 +48,10 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 function ActivityCalendar({ tasks, delights, month, year, selType }: { tasks: any[]; delights: any[]; month: number; year: number; selType: string }) {
   const [selDate, setSelDate] = useState<string | null>(null);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
-  const startOffset = firstDay === 0 ? 6 : firstDay - 1; // Mon start
+  const firstDay = new Date(year, month, 1).getDay();
+  const startOffset = firstDay === 0 ? 6 : firstDay - 1;
   const today = new Date().toISOString().slice(0, 10);
 
-  // Build day map
   const dayMap: Record<string, { tasks: number; delights: number; tasksDone: number }> = {};
   tasks.forEach(t => {
     const d = (t.completed_at || t.created_at || '').slice(0, 10);
@@ -68,21 +67,97 @@ function ActivityCalendar({ tasks, delights, month, year, selType }: { tasks: an
     dayMap[date].delights++;
   });
 
-  // Events for selected date
   const selTasks = selDate ? tasks.filter(t => (t.completed_at || t.created_at || '').slice(0, 10) === selDate) : [];
   const selDelights = selDate ? delights.filter(d => (d.booking_date || d.created_at || '').slice(0, 10) === selDate) : [];
-
   const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 8 }}>
+    <>
+      {/* Day detail MODAL — shows on click */}
+      {selDate && (
+        <div onClick={() => setSelDate(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '80vh', overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
+            {/* Modal header */}
+            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                  {new Date(selDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 3 }}>
+                  {selTasks.length} task{selTasks.length !== 1 ? 's' : ''} · {selDelights.length} delight{selDelights.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+              <button onClick={() => setSelDate(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
+            </div>
+            {/* Modal body */}
+            <div style={{ overflowY: 'auto', padding: '0 20px 20px', flex: 1 }}>
+              {selTasks.length === 0 && selDelights.length === 0 ? (
+                <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted-fg)' }}>No activity recorded on this day.</div>
+              ) : (
+                <>
+                  {selTasks.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Tasks ({selTasks.length})</div>
+                      {selTasks.map((t, i) => {
+                        const nm = t.notes?.match(/Butler: ([^·]+)/);
+                        const vm = t.notes?.match(/Villa: ([^·]+)/);
+                        const butler = nm ? nm[1].trim() : '—';
+                        const villa = vm ? vm[1].trim() : '—';
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid rgba(0,0,0,0.05)' }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: t.status==='completed'?'rgba(151,196,89,0.12)':'rgba(156,204,252,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
+                              {t.status==='completed'?'✅':'⏳'}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>{t.type}</div>
+                              <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>👤 {butler}</span>
+                                {villa !== '—' && <span style={{ fontSize: 11, color: '#0C447C' }}>🏡 {villa}</span>}
+                                {t.due_time && <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>⏰ {t.due_time}</span>}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20, flexShrink: 0, background: t.status==='completed'?'rgba(151,196,89,0.12)':'rgba(156,204,252,0.12)', color: t.status==='completed'?'#2D5A0E':'#0C447C' }}>
+                              {t.status}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {selDelights.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Guest delights ({selDelights.length})</div>
+                      {selDelights.map((d, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid rgba(0,0,0,0.05)' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: 'rgba(254,213,169,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🎁</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{d.booking_type || 'Delight'}</div>
+                            <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>👤 {d.your_name || '—'}</span>
+                              {d.villa_name && <span style={{ fontSize: 11, color: '#0C447C' }}>🏡 {d.villa_name}</span>}
+                              {d.booking_date && <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>📅 {d.booking_date}</span>}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20, flexShrink: 0, background: 'rgba(254,213,169,0.2)', color: '#7A4A08' }}>{d.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 10 }}>
         {days.map(d => (
           <div key={d} style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--muted-fg)', textAlign: 'center', padding: '4px 0', textTransform: 'uppercase', letterSpacing: 0.5 }}>{d}</div>
         ))}
-        {/* Empty cells for offset */}
         {Array.from({ length: startOffset }).map((_, i) => <div key={`e${i}`} />)}
-        {/* Day cells */}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const dayNum = i + 1;
           const iso = `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
@@ -93,13 +168,13 @@ function ActivityCalendar({ tasks, delights, month, year, selType }: { tasks: an
           const hasDelight = data?.delights > 0;
           const allDone = data && data.tasks > 0 && data.tasksDone === data.tasks;
           return (
-            <div key={iso} onClick={() => setSelDate(isSel ? null : iso)}
-              style={{ aspectRatio: '1', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: data ? 'pointer' : 'default', background: isSel ? '#1B1D1F' : isToday ? 'rgba(156,204,252,0.15)' : data ? 'rgba(151,196,89,0.08)' : 'transparent', border: `1.5px solid ${isSel ? '#1B1D1F' : isToday ? '#9CCCFC' : data ? 'rgba(151,196,89,0.3)' : 'rgba(0,0,0,0.05)'}`, transition: 'all 0.12s', position: 'relative' }}>
-              <span style={{ fontSize: 12, fontWeight: isToday || isSel ? 700 : 400, color: isSel ? '#fff' : isToday ? '#0C447C' : 'var(--sv-dark)' }}>{dayNum}</span>
+            <div key={iso} onClick={() => data && setSelDate(isSel ? null : iso)}
+              style={{ aspectRatio: '1', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: data ? 'pointer' : 'default', background: isSel ? '#1B1D1F' : isToday ? 'rgba(156,204,252,0.15)' : data ? 'rgba(151,196,89,0.06)' : 'transparent', border: `1.5px solid ${isSel ? '#1B1D1F' : isToday ? '#9CCCFC' : data ? 'rgba(151,196,89,0.25)' : 'rgba(0,0,0,0.05)'}`, transition: 'all 0.12s' }}>
+              <span style={{ fontSize: 13, fontWeight: isToday || isSel ? 700 : 400, color: isSel ? '#fff' : isToday ? '#0C447C' : data ? '#1B1D1F' : '#aaa' }}>{dayNum}</span>
               {data && (
                 <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
                   {hasTask && <div style={{ width: 5, height: 5, borderRadius: '50%', background: isSel ? '#9CCCFC' : allDone ? '#97C459' : '#9CCCFC' }} />}
-                  {hasDelight && <div style={{ width: 5, height: 5, borderRadius: '50%', background: isSel ? '#E9A0A7' : '#E9A0A7' }} />}
+                  {hasDelight && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#E9A0A7' }} />}
                 </div>
               )}
             </div>
@@ -107,49 +182,12 @@ function ActivityCalendar({ tasks, delights, month, year, selType }: { tasks: an
         })}
       </div>
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 12, fontSize: 10, color: 'var(--muted-fg)' }}>
-        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#9CCCFC', marginRight: 4 }} />Tasks</span>
-        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#97C459', marginRight: 4 }} />All tasks done</span>
-        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#E9A0A7', marginRight: 4 }} />Delights</span>
+      <div style={{ display: 'flex', gap: 14, fontSize: 10, color: 'var(--muted-fg)' }}>
+        {[['#9CCCFC','Tasks pending'],['#97C459','All tasks done'],['#E9A0A7','Delights']].map(([bg,label]) => (
+          <span key={label}><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: bg, marginRight: 4 }} />{label}</span>
+        ))}
       </div>
-      {/* Day detail */}
-      {selDate && (selTasks.length > 0 || selDelights.length > 0) && (
-        <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--muted-fg)' }}>
-            {new Date(selDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </div>
-          {selTasks.map((t, i) => {
-            const nm = t.notes?.match(/Butler: ([^·]+)/);
-            const vm = t.notes?.match(/Villa: ([^·]+)/);
-            return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: t.status === 'completed' ? '#97C459' : '#9CCCFC' }} />
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: 12, fontWeight: 500 }}>{t.type}</span>
-                  {nm && <span style={{ fontSize: 11, color: 'var(--muted-fg)', marginLeft: 6 }}>· {nm[1].trim()}</span>}
-                  {vm && <span style={{ fontSize: 11, color: '#0C447C', marginLeft: 6 }}>🏡 {vm[1].trim()}</span>}
-                </div>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: t.status==='completed'?'rgba(151,196,89,0.12)':'rgba(156,204,252,0.12)', color: t.status==='completed'?'#2D5A0E':'#0C447C' }}>{t.status}</span>
-              </div>
-            );
-          })}
-          {selDelights.map((d, i) => (
-            <div key={`d${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: '#E9A0A7' }} />
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 12, fontWeight: 500 }}>🎁 {d.booking_type}</span>
-                <span style={{ fontSize: 11, color: 'var(--muted-fg)', marginLeft: 6 }}>· {d.your_name}</span>
-                {d.villa_name && <span style={{ fontSize: 11, color: '#0C447C', marginLeft: 6 }}>🏡 {d.villa_name}</span>}
-              </div>
-              <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'rgba(254,213,169,0.2)', color: '#7A4A08' }}>{d.status}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {selDate && selTasks.length === 0 && selDelights.length === 0 && (
-        <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: 12, fontSize: 12, color: 'var(--muted-fg)', textAlign: 'center', padding: '12px 0' }}>No activity on this day</div>
-      )}
-    </div>
+    </>
   );
 }
 
