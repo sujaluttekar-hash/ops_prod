@@ -16,6 +16,8 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   const [questions, setQuestions] = useState<QuizQuestion[]>([{ question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'a' }]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [addQuiz, setAddQuiz] = useState(false);
+  const [step, setStep] = useState<'details' | 'quiz'>('details');
   const [error, setError] = useState('');
 
   const f = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -50,6 +52,17 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
 
       // Insert quiz questions if enabled
 
+
+      // Save quiz questions if added
+      if (addQuiz && huddle) {
+        const qs = questions.filter(q => q.question.trim());
+        if (qs.length > 0) {
+          await sb.from('huddle_quiz_questions').insert(
+            qs.map((q, i) => ({ huddle_id: huddle.id, question: q.question, option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d, correct_option: q.correct_option, order_no: i + 1 }))
+          );
+          await sb.from('huddles').update({ has_quiz: true }).eq('id', huddle.id);
+        }
+      }
 
       // Send notifications to all butlers
       const { data: butlers } = await sb.from('profiles').select('id').eq('role', 'butler').eq('is_active', true);
@@ -130,13 +143,75 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
 
                 </div>
 
+                {/* Quiz toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: addQuiz ? 'rgba(156,204,252,0.08)' : 'var(--muted)', borderRadius: 10, border: `1.5px solid ${addQuiz ? '#9CCCFC' : 'transparent'}`, cursor: 'pointer', marginBottom: 16 }}
+                  onClick={() => setAddQuiz(v => !v)}>
+                  <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${addQuiz ? '#9CCCFC' : '#ccc'}`, background: addQuiz ? '#9CCCFC' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#0C447C', flexShrink: 0 }}>
+                    {addQuiz ? '✓' : ''}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>Add quiz to this huddle</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>Butlers will answer questions after the huddle. Scores are recorded.</div>
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
-                  <button type="submit" className="sv-btn sv-btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Schedule huddle'}</button>
+                  {addQuiz ? (
+                    <button type="button" className="sv-btn sv-btn-primary" onClick={() => { if (!form.team || !form.huddle_date) { setError('Fill in team name and date first'); return; } setError(''); setStep('quiz'); }}>
+                      Next: Add quiz →
+                    </button>
+                  ) : (
+                    <button type="submit" className="sv-btn sv-btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Schedule huddle'}</button>
+                  )}
                 </div>
               
 
             
+          {step === 'quiz' && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-fg)' }}>{questions.length}/10 questions added</div>
+                <button type="button" className="sv-btn" onClick={() => setStep('details')}>← Back</button>
+              </div>
+              {questions.map((q, i) => (
+                <div key={i} style={{ background: 'var(--muted)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600 }}>Question {i + 1}</span>
+                    {questions.length > 1 && <button type="button" onClick={() => setQuestions(qs => qs.filter((_, j) => j !== i))} style={{ fontSize: 11, color: '#8B2020', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>}
+                  </div>
+                  <input className="sv-input" style={{ width: '100%', marginBottom: 8, background: '#fff' }} placeholder="Enter question" value={q.question} onChange={e => setQuestions(qs => qs.map((qq, j) => j === i ? { ...qq, question: e.target.value } : qq))} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+                    {(['a','b','c','d'] as const).map(opt => (
+                      <div key={opt} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, width: 14 }}>{opt.toUpperCase()}</span>
+                        <input className="sv-input" style={{ flex: 1, background: '#fff', fontSize: 12 }} placeholder={`Option ${opt.toUpperCase()}`} value={(q as any)[`option_${opt}`]} onChange={e => setQuestions(qs => qs.map((qq, j) => j === i ? { ...qq, [`option_${opt}`]: e.target.value } : qq))} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>Correct answer:</span>
+                    {(['a','b','c','d'] as const).map(opt => (
+                      <button key={opt} type="button" onClick={() => setQuestions(qs => qs.map((qq, j) => j === i ? { ...qq, correct_option: opt } : qq))}
+                        style={{ width: 28, height: 28, borderRadius: 6, border: `1.5px solid ${q.correct_option === opt ? '#97C459' : '#ccc'}`, background: q.correct_option === opt ? '#97C459' : 'white', fontWeight: 700, fontSize: 11, color: q.correct_option === opt ? '#fff' : '#666', cursor: 'pointer' }}>
+                        {opt.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {questions.length < 10 && (
+                <button type="button" className="sv-btn" style={{ width: '100%', marginBottom: 12, justifyContent: 'center' }}
+                  onClick={() => setQuestions(qs => [...qs, { question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'a', order_no: qs.length + 1 }])}>
+                  + Add question ({questions.length}/10)
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
+                <button type="button" className="sv-btn sv-btn-primary" disabled={saving} onClick={handleSave as any}>{saving ? 'Saving…' : 'Schedule with quiz'}</button>
+              </div>
+            </div>
+          )}
           </form>
         )}
       </div>
