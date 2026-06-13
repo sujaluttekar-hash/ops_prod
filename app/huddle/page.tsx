@@ -143,28 +143,12 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
                     <input className="sv-input" style={{ width: '100%' }} placeholder="https://meet.google.com/xxx-xxxx-xxx" value={form.meet_link} onChange={f('meet_link')} />
                   </div>
 
-                  {/* Quiz toggle */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: addQuiz ? 'rgba(156,204,252,0.08)' : 'var(--muted)', borderRadius: 10, border: `1.5px solid ${addQuiz ? '#9CCCFC' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.15s' }}
-                    onClick={() => setAddQuiz(v => !v)}>
-                    <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${addQuiz ? '#9CCCFC' : '#ccc'}`, background: addQuiz ? '#9CCCFC' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#0C447C', flexShrink: 0 }}>
-                      {addQuiz ? '✓' : ''}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>Add quiz to this huddle</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>Butlers will answer questions after the huddle. Scores are recorded.</div>
-                    </div>
-                  </div>
+
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
-                  {addQuiz ? (
-                    <button type="button" className="sv-btn sv-btn-primary" onClick={() => { if (!form.team || !form.huddle_date) { setError('Fill in team name and date first'); return; } setError(''); setStep('quiz'); }}>
-                      Next: Add quiz →
-                    </button>
-                  ) : (
-                    <button type="submit" className="sv-btn sv-btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Schedule huddle'}</button>
-                  )}
+                  <button type="submit" className="sv-btn sv-btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Schedule huddle'}</button>
                 </div>
               </>
             )}
@@ -227,10 +211,11 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
 }
 
 
-// ── Butler self-attend button ─────────────────────────────────
+// ── Butler acknowledgement button ────────────────────────────
 function ButlerAttendButton({ huddleId, butlerId }: { huddleId: string; butlerId: string }) {
   const [attended, setAttended] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     getServiceSupabase()
@@ -239,30 +224,57 @@ function ButlerAttendButton({ huddleId, butlerId }: { huddleId: string; butlerId
       .eq('huddle_id', huddleId)
       .eq('butler_id', butlerId)
       .maybeSingle()
-      .then(({ data }: any) => {
-        setAttended(data?.attended ?? false);
-      });
+      .then(({ data }: any) => { setAttended(data?.attended ?? false); });
   }, [huddleId, butlerId]);
 
-  async function toggle() {
+  async function acknowledge() {
     setSaving(true);
-    const newVal = !attended;
     await getServiceSupabase()
       .from('huddle_attendance')
-      .upsert({ huddle_id: huddleId, butler_id: butlerId, attended: newVal }, { onConflict: 'huddle_id,butler_id' });
-    setAttended(newVal);
+      .upsert({ huddle_id: huddleId, butler_id: butlerId, attended: true, acknowledged_at: new Date().toISOString() }, { onConflict: 'huddle_id,butler_id' });
+    setAttended(true);
+    setShowConfirm(false);
     setSaving(false);
   }
 
   if (attended === null) return null;
+
+  if (attended) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#2D5A0E', background: 'rgba(151,196,89,0.12)', border: '1px solid #97C459', borderRadius: 6, padding: '3px 10px' }}>
+        ✅ Acknowledged
+      </div>
+    );
+  }
+
   return (
-    <button
-      className="sv-btn"
-      style={{ fontSize: 11, padding: '3px 10px', background: attended ? 'rgba(151,196,89,0.15)' : undefined, color: attended ? '#2D5A0E' : undefined, borderColor: attended ? '#97C459' : undefined }}
-      onClick={toggle}
-      disabled={saving}>
-      {saving ? '…' : attended ? '✅ Attended' : '◎ Mark me present'}
-    </button>
+    <>
+      {showConfirm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setShowConfirm(false)}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 24, maxWidth: 340, width: '100%', boxShadow: '0 24px 60px rgba(0,0,0,0.2)', textAlign: 'center' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>✋</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Acknowledge huddle</div>
+            <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginBottom: 20, lineHeight: 1.5 }}>
+              By acknowledging, you confirm that you have attended or reviewed this huddle and understand the agenda.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="sv-btn" onClick={() => setShowConfirm(false)} style={{ flex: 1 }}>Cancel</button>
+              <button className="sv-btn sv-btn-primary" onClick={acknowledge} disabled={saving} style={{ flex: 2 }}>
+                {saving ? 'Saving…' : '✅ I acknowledge this huddle'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <button
+        className="sv-btn"
+        style={{ fontSize: 11, padding: '3px 10px' }}
+        onClick={() => setShowConfirm(true)}>
+        ✋ Acknowledge
+      </button>
+    </>
   );
 }
 
