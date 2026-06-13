@@ -103,12 +103,44 @@ function AssignTaskModal({ onClose, onDone }: { onClose: () => void; onDone: () 
   );
 }
 
+
+// ── Voice recorder hook ───────────────────────────────────────
+function useVoiceRecorder() {
+  const [recording, setRecording] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [duration, setDuration] = useState(0);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob); setAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mr.start(); mediaRef.current = mr; setRecording(true); setDuration(0);
+      timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+    } catch { alert('Microphone permission denied'); }
+  }
+  function stopRecording() { mediaRef.current?.stop(); setRecording(false); if (timerRef.current) clearInterval(timerRef.current); }
+  function clearRecording() { setAudioUrl(null); setAudioBlob(null); setDuration(0); }
+  return { recording, audioUrl, audioBlob, duration, startRecording, stopRecording, clearRecording };
+}
+
 // ── Complete Task Modal ────────────────────────────────────────
 function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () => void; onDone: (taskId: string) => void }) {
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const voice = useVoiceRecorder();
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -156,6 +188,18 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ butler_id: u.id, butler_name: u.name, squad: u.squad || null, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy }),
             });
+          }
+        } catch {}
+      }
+
+      // Upload voice note if recorded
+      if (voice.audioBlob) {
+        try {
+          const vPath = `tasks/voice_${task.id}_${Date.now()}.webm`;
+          const { data: vData } = await getServiceSupabase().storage.from('delight-photos').upload(vPath, voice.audioBlob, { upsert: true, contentType: 'audio/webm' });
+          if (vData) {
+            const { data: { publicUrl } } = getServiceSupabase().storage.from('delight-photos').getPublicUrl(vData.path);
+            await getServiceSupabase().from('tasks').update({ voice_url: publicUrl }).eq('id', task.id);
           }
         } catch {}
       }
