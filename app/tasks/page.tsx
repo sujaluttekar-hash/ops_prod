@@ -237,24 +237,32 @@ export default function TasksPage() {
               <button onClick={() => setViewPhoto(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)', padding: '0 4px' }}>✕</button>
             </div>
             {/* Photo */}
-            <div style={{ background: '#f5f5f3', position: 'relative' }}>
-              <img src={viewPhoto.photo_path} alt="Task proof"
-                style={{ width: '100%', maxHeight: '55vh', objectFit: 'contain', display: 'block' }} />
-              {/* Status overlay */}
-              <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(151,196,89,0.9)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>
-                ✅ Completed
+            {viewPhoto.photo_path ? (
+              <div style={{ background: '#f5f5f3', position: 'relative' }}>
+                <img src={viewPhoto.photo_path} alt="Task proof"
+                  style={{ width: '100%', maxHeight: '55vh', objectFit: 'contain', display: 'block' }} />
+                <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(151,196,89,0.9)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>
+                  ✅ Completed
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ background: '#f5f5f3', padding: '40px 0', textAlign: 'center', color: 'var(--muted-fg)', fontSize: 13 }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+                No photo uploaded for this task.
+              </div>
+            )}
             {/* Footer */}
             <div style={{ padding: '14px 20px', display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--muted-fg)' }}>
                 Completed: {viewPhoto.completed_at ? new Date(viewPhoto.completed_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <a href={viewPhoto.photo_path} download target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
-                  <button className="sv-btn" style={{ fontSize: 12 }}>⬇ Download</button>
-                </a>
-                <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setViewPhoto(null)}>✓ Verified</button>
+                {viewPhoto.photo_path && (
+                  <a href={viewPhoto.photo_path} download target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                    <button className="sv-btn" style={{ fontSize: 12 }}>⬇ Download</button>
+                  </a>
+                )}
+                <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setViewPhoto(null)}>✓ Close</button>
               </div>
             </div>
           </div>
@@ -388,16 +396,13 @@ export default function TasksPage() {
                               Complete task
                             </button>
                           ) : t.status === 'completed' ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                               <span style={{ fontSize: 12, color: '#2D5A0E', fontWeight: 600 }}>✅ Done</span>
-                              {(t as any).photo_path && (
-                                <img
-                                  src={(t as any).photo_path}
-                                  alt="proof"
-                                  onClick={() => setViewPhoto((t as any).photo_path)}
-                                  style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 5, cursor: 'pointer', border: '1.5px solid #97C459' }}
-                                />
-                              )}
+                              <button
+                                onClick={() => setViewPhoto(t)}
+                                style={{ fontSize: 10, padding: '3px 8px', background: (t as any).photo_path ? 'rgba(151,196,89,0.15)' : 'rgba(0,0,0,0.05)', border: `1px solid ${(t as any).photo_path ? '#97C459' : 'rgba(0,0,0,0.1)'}`, borderRadius: 5, cursor: 'pointer', color: (t as any).photo_path ? '#2D5A0E' : 'var(--muted-fg)', fontWeight: 600 }}>
+                                {(t as any).photo_path ? '📷 View photo' : '📋 Details'}
+                              </button>
                             </div>
                           ) : (
                             <span style={{ fontSize: 12, color: '#8B2020' }}>⚠ Delayed</span>
