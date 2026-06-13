@@ -23,7 +23,6 @@ const navByRole: Record<string, NavSection> = {
     ],
     learning: [
       { label: 'Training', href: '/training', icon: '📚' },
-      { label: 'Quizzes', href: '/quiz', icon: '❓' },
     ],
     admin: [
       { label: 'Credentials', href: '/credentials', icon: '🔐' },
@@ -44,7 +43,6 @@ const navByRole: Record<string, NavSection> = {
     ],
     learning: [
       { label: 'Training', href: '/training', icon: '📚' },
-      { label: 'Quizzes', href: '/quiz', icon: '❓' },
     ],
     admin: [{ label: 'MIS & Reports', href: '/reports', icon: '📈' }],
   },
@@ -60,7 +58,6 @@ const navByRole: Record<string, NavSection> = {
     ],
     learning: [
       { label: 'My trainings', href: '/training', icon: '📚' },
-      { label: 'My quizzes', href: '/quiz', icon: '❓' },
       { label: 'Huddles', href: '/huddle', icon: '💬' },
     ],
     admin: [],
@@ -70,7 +67,6 @@ const navByRole: Record<string, NavSection> = {
     operations: [],
     learning: [
       { label: 'Training', href: '/training', icon: '📚' },
-      { label: 'Quizzes', href: '/quiz', icon: '❓' },
     ],
     admin: [],
   },
