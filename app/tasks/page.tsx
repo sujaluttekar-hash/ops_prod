@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchTasks, getServiceSupabase, uploadTaskPhoto, type Task } from '@/lib/supabase';
+import { fetchTasks, getServiceSupabase, uploadTaskPhoto, LOCAL_PROFILES, type Task } from '@/lib/supabase';
 import { getCurrentPosition } from '@/lib/get-location';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -308,9 +308,12 @@ export default function TasksPage() {
                   {filtered.map(t => {
                     const tAny = t as any;
                     const isPending = t.status === 'pending';
-                    // Extract villa name — notes format: "Butler: Name · ButlerID: uuid · Villa: VillaName"
+                    // Extract villa — handle multiple note formats
                     const villaMatch = t.notes?.match(/Villa: ([^·\n]+)/);
-                    const villaName = villaMatch ? villaMatch[1].trim() : (t.notes && !t.notes.startsWith('Butler:') ? t.notes.split(' · ')[0] : '—');
+                    const hasButlerPrefix = t.notes?.startsWith('Butler:');
+                    const villaName = villaMatch
+                      ? villaMatch[1].trim()
+                      : (!hasButlerPrefix && t.notes && t.notes.trim() ? t.notes.split(' · ')[0].trim() : '—');
                     return (
                       <tr key={t.id}>
                         <td>
@@ -323,10 +326,10 @@ export default function TasksPage() {
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                               {(() => {
-                                // Extract butler name from notes: "Butler: Name · ..."
-                                const nameMatch = t.notes?.match(/Butler: ([^·
-]+)/);
-                                const butlerName = nameMatch ? nameMatch[1].trim() : (tAny.profiles?.name || null);
+                                // Extract butler name from notes OR by butler_id UUID lookup
+                                const nameMatch = t.notes?.match(/Butler: ([^\u00b7\n]+)/);
+                                const profileMatch = t.butler_id ? LOCAL_PROFILES.find((p: any) => p.id === t.butler_id) : null;
+                                const butlerName = (nameMatch ? nameMatch[1].trim() : null) || profileMatch?.name || tAny.profiles?.name || null;
                                 return (
                                   <>
                                     <div className="sv-avatar" style={{ width: 24, height: 24, fontSize: 9 }}>
