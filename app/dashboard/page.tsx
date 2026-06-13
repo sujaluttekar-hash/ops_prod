@@ -43,6 +43,116 @@ function DonutChart({ done, total, color, label, sublabel }: { done: number; tot
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+
+// ── Activity Calendar ─────────────────────────────────────────
+function ActivityCalendar({ tasks, delights, month, year, selType }: { tasks: any[]; delights: any[]; month: number; year: number; selType: string }) {
+  const [selDate, setSelDate] = useState<string | null>(null);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const startOffset = firstDay === 0 ? 6 : firstDay - 1; // Mon start
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Build day map
+  const dayMap: Record<string, { tasks: number; delights: number; tasksDone: number }> = {};
+  tasks.forEach(t => {
+    const d = (t.completed_at || t.created_at || '').slice(0, 10);
+    if (!d) return;
+    if (!dayMap[d]) dayMap[d] = { tasks: 0, delights: 0, tasksDone: 0 };
+    dayMap[d].tasks++;
+    if (t.status === 'completed') dayMap[d].tasksDone++;
+  });
+  delights.forEach(d => {
+    const date = (d.booking_date || d.created_at || '').slice(0, 10);
+    if (!date) return;
+    if (!dayMap[date]) dayMap[date] = { tasks: 0, delights: 0, tasksDone: 0 };
+    dayMap[date].delights++;
+  });
+
+  // Events for selected date
+  const selTasks = selDate ? tasks.filter(t => (t.completed_at || t.created_at || '').slice(0, 10) === selDate) : [];
+  const selDelights = selDate ? delights.filter(d => (d.booking_date || d.created_at || '').slice(0, 10) === selDate) : [];
+
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 8 }}>
+        {days.map(d => (
+          <div key={d} style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--muted-fg)', textAlign: 'center', padding: '4px 0', textTransform: 'uppercase', letterSpacing: 0.5 }}>{d}</div>
+        ))}
+        {/* Empty cells for offset */}
+        {Array.from({ length: startOffset }).map((_, i) => <div key={`e${i}`} />)}
+        {/* Day cells */}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const dayNum = i + 1;
+          const iso = `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
+          const data = dayMap[iso];
+          const isToday = iso === today;
+          const isSel = iso === selDate;
+          const hasTask = data?.tasks > 0;
+          const hasDelight = data?.delights > 0;
+          const allDone = data && data.tasks > 0 && data.tasksDone === data.tasks;
+          return (
+            <div key={iso} onClick={() => setSelDate(isSel ? null : iso)}
+              style={{ aspectRatio: '1', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: data ? 'pointer' : 'default', background: isSel ? '#1B1D1F' : isToday ? 'rgba(156,204,252,0.15)' : data ? 'rgba(151,196,89,0.08)' : 'transparent', border: `1.5px solid ${isSel ? '#1B1D1F' : isToday ? '#9CCCFC' : data ? 'rgba(151,196,89,0.3)' : 'rgba(0,0,0,0.05)'}`, transition: 'all 0.12s', position: 'relative' }}>
+              <span style={{ fontSize: 12, fontWeight: isToday || isSel ? 700 : 400, color: isSel ? '#fff' : isToday ? '#0C447C' : 'var(--sv-dark)' }}>{dayNum}</span>
+              {data && (
+                <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
+                  {hasTask && <div style={{ width: 5, height: 5, borderRadius: '50%', background: isSel ? '#9CCCFC' : allDone ? '#97C459' : '#9CCCFC' }} />}
+                  {hasDelight && <div style={{ width: 5, height: 5, borderRadius: '50%', background: isSel ? '#E9A0A7' : '#E9A0A7' }} />}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 12, fontSize: 10, color: 'var(--muted-fg)' }}>
+        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#9CCCFC', marginRight: 4 }} />Tasks</span>
+        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#97C459', marginRight: 4 }} />All tasks done</span>
+        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#E9A0A7', marginRight: 4 }} />Delights</span>
+      </div>
+      {/* Day detail */}
+      {selDate && (selTasks.length > 0 || selDelights.length > 0) && (
+        <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--muted-fg)' }}>
+            {new Date(selDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </div>
+          {selTasks.map((t, i) => {
+            const nm = t.notes?.match(/Butler: ([^·]+)/);
+            const vm = t.notes?.match(/Villa: ([^·]+)/);
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: t.status === 'completed' ? '#97C459' : '#9CCCFC' }} />
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: 12, fontWeight: 500 }}>{t.type}</span>
+                  {nm && <span style={{ fontSize: 11, color: 'var(--muted-fg)', marginLeft: 6 }}>· {nm[1].trim()}</span>}
+                  {vm && <span style={{ fontSize: 11, color: '#0C447C', marginLeft: 6 }}>🏡 {vm[1].trim()}</span>}
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: t.status==='completed'?'rgba(151,196,89,0.12)':'rgba(156,204,252,0.12)', color: t.status==='completed'?'#2D5A0E':'#0C447C' }}>{t.status}</span>
+              </div>
+            );
+          })}
+          {selDelights.map((d, i) => (
+            <div key={`d${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid rgba(0,0,0,0.04)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: '#E9A0A7' }} />
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 12, fontWeight: 500 }}>🎁 {d.booking_type}</span>
+                <span style={{ fontSize: 11, color: 'var(--muted-fg)', marginLeft: 6 }}>· {d.your_name}</span>
+                {d.villa_name && <span style={{ fontSize: 11, color: '#0C447C', marginLeft: 6 }}>🏡 {d.villa_name}</span>}
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: 'rgba(254,213,169,0.2)', color: '#7A4A08' }}>{d.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {selDate && selTasks.length === 0 && selDelights.length === 0 && (
+        <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: 12, fontSize: 12, color: 'var(--muted-fg)', textAlign: 'center', padding: '12px 0' }}>No activity on this day</div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { user } = useAuth()
   const { status: locStatus } = useButlerLocation(user?.role === 'butler' ? user as any : null)
@@ -301,7 +411,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── BAR CHARTS ────────────────────────────────────────── */}
+        {/* ── CHARTS + CALENDAR ─────────────────────────────────── */}
         {isSuper && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
             <div className="sv-card">
@@ -310,16 +420,19 @@ export default function DashboardPage() {
             <div className="sv-card">
               <BarChart data={delightsByButler.length > 0 ? delightsByButler : [{name:'No data',value:0}]} color="#E9A0A7" label={`Delights per butler · ${MONTHS[selMonth]}`} />
             </div>
-            {selVilla === 'All' && (
-              <>
-                <div className="sv-card">
-                  <BarChart data={tasksByVilla.length > 0 ? tasksByVilla : [{name:'No data',value:0}]} color="#97C459" label="Tasks per villa" />
-                </div>
-                <div className="sv-card">
-                  <BarChart data={delightsByVilla.length > 0 ? delightsByVilla : [{name:'No data',value:0}]} color="#FED5A9" label="Delights per villa" />
-                </div>
-              </>
-            )}
+          </div>
+        )}
+
+        {/* ── ACTIVITY CALENDAR ─────────────────────────────────── */}
+        {isSuper && (
+          <div className="sv-card" style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Activity calendar</div>
+                <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>Click any day to see what happened — tasks assigned, completed, delights logged</div>
+              </div>
+            </div>
+            <ActivityCalendar tasks={filtTasks} delights={filtDelights} month={selMonth} year={selYear} selType={selType} />
           </div>
         )}
 

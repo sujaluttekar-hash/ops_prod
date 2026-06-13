@@ -167,7 +167,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
   const [completeTask, setCompleteTask] = useState<any | null>(null);
-  const [viewPhoto, setViewPhoto] = useState<string | null>(null);
+  const [viewPhoto, setViewPhoto] = useState<any | null>(null);
 
   const isSuper = user ? isSupervisor(user.role as any) : false;
 
@@ -215,14 +215,48 @@ export default function TasksPage() {
   return (
     <>
       {/* Photo lightbox */}
+      {/* Task photo verification modal */}
       {viewPhoto && (
-        <div onClick={() => setViewPhoto(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ position: 'relative', maxWidth: 500, width: '100%' }}>
-            <img src={viewPhoto} alt="Task proof" style={{ width: '100%', borderRadius: 12, maxHeight: '80vh', objectFit: 'contain' }} />
-            <button onClick={() => setViewPhoto(null)} style={{ position: 'absolute', top: -12, right: -12, width: 32, height: 32, borderRadius: '50%', background: '#fff', border: 'none', fontSize: 16, cursor: 'pointer', fontWeight: 700 }}>✕</button>
-            <a href={viewPhoto} download target="_blank" rel="noreferrer">
-              <button style={{ position: 'absolute', bottom: -14, left: '50%', transform: 'translateX(-50%)', background: '#1B1D1F', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, cursor: 'pointer' }}>⬇ Download photo</button>
-            </a>
+        <div onClick={() => setViewPhoto(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 520, boxShadow: '0 32px 80px rgba(0,0,0,0.3)', overflow: 'hidden' }}
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>Task proof — {viewPhoto.type}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 3, display: 'flex', gap: 10 }}>
+                  {(() => {
+                    const nameMatch = viewPhoto.notes?.match(/Butler: ([^·]+)/);
+                    const butler = nameMatch ? nameMatch[1].trim() : '—';
+                    const villaMatch = viewPhoto.notes?.match(/Villa: ([^·]+)/);
+                    const villa = villaMatch ? villaMatch[1].trim() : '—';
+                    return <><span>👤 {butler}</span><span>🏡 {villa}</span>{viewPhoto.due_time && <span>⏰ {viewPhoto.due_time}</span>}</>;
+                  })()}
+                </div>
+              </div>
+              <button onClick={() => setViewPhoto(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)', padding: '0 4px' }}>✕</button>
+            </div>
+            {/* Photo */}
+            <div style={{ background: '#f5f5f3', position: 'relative' }}>
+              <img src={viewPhoto.photo_path} alt="Task proof"
+                style={{ width: '100%', maxHeight: '55vh', objectFit: 'contain', display: 'block' }} />
+              {/* Status overlay */}
+              <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(151,196,89,0.9)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>
+                ✅ Completed
+              </div>
+            </div>
+            {/* Footer */}
+            <div style={{ padding: '14px 20px', display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--muted-fg)' }}>
+                Completed: {viewPhoto.completed_at ? new Date(viewPhoto.completed_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <a href={viewPhoto.photo_path} download target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                  <button className="sv-btn" style={{ fontSize: 12 }}>⬇ Download</button>
+                </a>
+                <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setViewPhoto(null)}>✓ Verified</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -309,7 +343,7 @@ export default function TasksPage() {
                     const tAny = t as any;
                     const isPending = t.status === 'pending';
                     // Extract villa — handle multiple note formats
-                    const villaMatch = t.notes?.match(/Villa: ([^·\n]+)/);
+                    const villaMatch = t.notes?.match(/Villa: ([^·]+)/);
                     const hasButlerPrefix = t.notes?.startsWith('Butler:');
                     const villaName = villaMatch
                       ? villaMatch[1].trim()
