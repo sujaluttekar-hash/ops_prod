@@ -13,7 +13,7 @@ const navByRole: Record<string, NavSection> = {
   super_admin: {
     overview: [{ label: 'Dashboard', href: '/dashboard', icon: '📊' }],
     operations: [
-      { label: 'Allocation', href: '/allocation', icon: '📋' },
+      { label: 'Daily roster', href: '/allocation', icon: '📋' },
       { label: 'Guest delight', href: '/delight', icon: '🎁' },
       { label: 'Tasks', href: '/tasks', icon: '✓' },
       { label: 'Attendance', href: '/attendance', icon: '📅' },
@@ -33,7 +33,7 @@ const navByRole: Record<string, NavSection> = {
   ops_manager: {
     overview: [{ label: 'Dashboard', href: '/dashboard', icon: '📊' }],
     operations: [
-      { label: 'Allocation', href: '/allocation', icon: '📋' },
+      { label: 'Daily roster', href: '/allocation', icon: '📋' },
       { label: 'Guest delight', href: '/delight', icon: '🎁' },
       { label: 'Tasks', href: '/tasks', icon: '✓' },
       { label: 'Attendance', href: '/attendance', icon: '📅' },

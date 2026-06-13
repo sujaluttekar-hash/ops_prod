@@ -10,6 +10,99 @@ import { isSupervisor } from '@/lib/auth';
 const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Custom task'];
 const taskEmoji: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋','Custom task':'✏️' };
 
+// ── Assign Task Modal (moved from Allocation) ────────────────
+function AssignTaskModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [butlers, setButlers] = useState<any[]>([]);
+  const [form, setForm] = useState({ butler_id: '', butler_name: '', task_type: '', villa: '', due_time: '', notes: '', booking_type: 'Booking' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    getServiceSupabase().from('profiles').select('id,name,squad').eq('role','butler').eq('is_active',true).order('name')
+      .then(({ data }: any) => setButlers(data || []));
+  }, []);
+
+  async function handleSave() {
+    if (!form.butler_id || !form.task_type) { setError('Select butler and task type'); return; }
+    setSaving(true); setError('');
+    const butler = butlers.find(b => b.id === form.butler_id);
+    const notes = [`Butler: ${butler?.name || ''}`, `ButlerID: ${form.butler_id}`, form.villa ? `Villa: ${form.villa}` : '', form.notes || ''].filter(Boolean).join(' · ');
+    const { error: err } = await getServiceSupabase().from('tasks').insert({
+      type: form.task_type === 'Custom task' ? (form.notes || 'Custom task') : form.task_type,
+      butler_id: form.butler_id, status: 'pending',
+      due_time: form.due_time || null, notes,
+    });
+    if (err) { setError(err.message); setSaving(false); return; }
+    try {
+      await getServiceSupabase().from('notifications').insert({
+        user_id: form.butler_id, title: 'New task assigned',
+        body: `${form.task_type}${form.villa ? ' at ' + form.villa : ''}${form.due_time ? ' · Due ' + form.due_time : ''}`,
+        type: 'task', read: false,
+      });
+    } catch {}
+    onDone(); onClose();
+  }
+
+  const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Custom task'];
+  const TASK_EMOJIS: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋','Custom task':'✏️' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Assign task</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
+        </div>
+        <div className="sv-strip" style={{ marginBottom: 18 }} />
+        {error && <div style={{ background: 'rgba(233,160,167,0.15)', border: '1px solid #E9A0A7', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
+
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Butler *</div>
+          <select className="sv-select" style={{ width: '100%' }} value={form.butler_id}
+            onChange={e => { const b = butlers.find(x => x.id === e.target.value); setForm(f => ({ ...f, butler_id: e.target.value, butler_name: b?.name || '' })); }}>
+            <option value="">Select butler…</option>
+            {butlers.map(b => <option key={b.id} value={b.id}>{b.name} · {b.squad}</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Task type *</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 7 }}>
+            {TASK_TYPES.map(tt => (
+              <button key={tt} type="button" onClick={() => setForm(f => ({ ...f, task_type: f.task_type === tt ? '' : tt }))}
+                style={{ padding: '8px 10px', borderRadius: 9, border: `1.5px solid ${form.task_type === tt ? '#9CCCFC' : 'rgba(0,0,0,0.1)'}`, background: form.task_type === tt ? 'rgba(156,204,252,0.1)' : 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: form.task_type === tt ? 600 : 400 }}>
+                <span style={{ fontSize: 16 }}>{TASK_EMOJIS[tt]}</span>{tt}
+              </button>
+            ))}
+          </div>
+          {form.task_type === 'Custom task' && (
+            <input className="sv-input" style={{ width: '100%', marginTop: 8 }} placeholder="Describe the task…"
+              value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Villa</div>
+            <input className="sv-input" style={{ width: '100%' }} placeholder="Villa name" value={form.villa} onChange={e => setForm(f => ({ ...f, villa: e.target.value }))} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Due time</div>
+            <input className="sv-input" style={{ width: '100%' }} type="time" value={form.due_time} onChange={e => setForm(f => ({ ...f, due_time: e.target.value }))} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="sv-btn" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+          <button className="sv-btn sv-btn-primary" onClick={handleSave} disabled={saving} style={{ flex: 2 }}>
+            {saving ? 'Assigning…' : 'Assign task'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Complete Task Modal ────────────────────────────────────────
 function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () => void; onDone: (taskId: string) => void }) {
   const [notes, setNotes] = useState('');
@@ -167,6 +260,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
   const [completeTask, setCompleteTask] = useState<any | null>(null);
+  const [showAssign, setShowAssign] = useState(false);
   const [viewPhoto, setViewPhoto] = useState<any | null>(null);
 
   const isSuper = user ? isSupervisor(user.role as any) : false;
@@ -214,6 +308,7 @@ export default function TasksPage() {
 
   return (
     <>
+      {showAssign && <AssignTaskModal onClose={() => setShowAssign(false)} onDone={load} />}
       {/* Photo lightbox */}
       {/* Task photo verification modal */}
       {viewPhoto && (
@@ -275,8 +370,13 @@ export default function TasksPage() {
         // Also re-fetch from Supabase after a short delay
         setTimeout(load, 1000);
       }} />}
-      <Topbar title={isSuper ? 'Utilisation tasks' : 'My tasks'} subtitle={isSuper ? 'Daily butler task tracking' : `Tasks assigned to you · v${new Date().getMinutes()}`}
-        actions={<button className="sv-btn" style={{ fontSize: 12 }} onClick={() => load()}>↻ Refresh</button>} />
+      <Topbar title={isSuper ? 'Tasks' : 'My tasks'} subtitle={isSuper ? 'Assign and track butler tasks' : `Tasks assigned to you`}
+        actions={
+          <div style={{ display: 'flex', gap: 6 }}>
+            {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowAssign(true)}>+ Assign task</button>}
+            <button className="sv-btn" style={{ fontSize: 12 }} onClick={() => load()}>↻ Refresh</button>
+          </div>
+        } />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
 
