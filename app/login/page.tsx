@@ -3,17 +3,17 @@ import { useState } from 'react'
 
 // Exact match to Supabase profiles table
 const USERS: Record<string, { password: string; role: string; name: string; squad: string | null; id: string }> = {
-  'admin@stayvista.com':         { id: 'd035c01f-6987-4e76-8ab7-a562235ed2c8', password: 'StayVista@2026',   role: 'super_admin', name: 'Aditi',           squad: 'All' },
-  'sujal@stayvista.com':         { id: '8d5da751-3269-4d77-b837-45253a9435c5', password: 'sujal@123',        role: 'ops_manager', name: 'Sujal',           squad: 'All' },
-  'sujal.uttekar@stayvista.com': { id: 'd71e6f0f-916d-4fec-af8d-d14113f70ae4', password: 'StayVista@2026',   role: 'butler',      name: 'Sujal Uttekar',   squad: null },
-  'atish@stayvista.com':         { id: 'fedb395e-476c-43d7-a76f-c87f8e508856', password: 'atish@123',        role: 'butler',      name: 'Atish Tandkar',   squad: 'Nashik' },
-  'kalpesh@stayvista.com':       { id: '30ebc89e-17fc-43db-b9a8-46398d24a1e3', password: 'kalpesh@123',      role: 'butler',      name: 'Kalpesh Ther',    squad: 'Alibaug' },
-  'kohinoor@stayvista.com':      { id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', password: 'kohinoor@123',     role: 'butler',      name: 'Kohinoor Shinde', squad: 'Karjat' },
-  'manoj@stayvista.com':         { id: '24e03c68-5cd0-47aa-a695-75850ac2a81d', password: 'manoj@123',        role: 'butler',      name: 'Manoj Valmiki',   squad: 'Lonavala' },
-  'nimish@stayvista.com':        { id: '326c84fa-7c94-42a4-b7a2-6545f1398308', password: 'nimish@123',       role: 'butler',      name: 'Nimish',          squad: 'Alibaug' },
-  'butler@stayvista.com':        { id: '0835f144-513d-4107-968f-bb0c3ddbd6df', password: 'butler@123',       role: 'butler',      name: 'Ravi Kumar',      squad: 'Lonavala' },
-  'vinayak@stayvista.com':       { id: '4b2cc4e7-876b-490a-a315-192c67424328', password: 'vinayak@123',      role: 'butler',      name: 'Vinayak Kharade', squad: 'Lonavala' },
-  'vishal@stayvista.com':        { id: '4ab59e13-1d68-4607-bef8-b9fb013827ac', password: 'vishal@123',       role: 'butler',      name: 'Vishal',          squad: 'Karjat' },
+  'admin@stayvista.com':         { id: 'd035c01f-6987-4e76-8ab7-a562235ed2c8', password: 'StayVista@2026', role: 'super_admin', name: 'Aditi',           squad: 'All'      },
+  'sujal@stayvista.com':         { id: '8d5da751-3269-4d77-b837-45253a9435c5', password: 'sujal@123',      role: 'ops_manager', name: 'Sujal',           squad: 'All'      },
+  'sujal.uttekar@stayvista.com': { id: 'd71e6f0f-916d-4fec-af8d-d14113f70ae4', password: 'StayVista@2026', role: 'butler',      name: 'Sujal Uttekar',   squad: null       },
+  'atish@stayvista.com':         { id: 'fedb395e-476c-43d7-a76f-c87f8e508856', password: 'atish@123',      role: 'butler',      name: 'Atish Tandkar',   squad: 'Nashik'   },
+  'kalpesh@stayvista.com':       { id: '30ebc89e-17fc-43db-b9a8-46398d24a1e3', password: 'kalpesh@123',    role: 'butler',      name: 'Kalpesh Ther',    squad: 'Alibaug'  },
+  'kohinoor@stayvista.com':      { id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', password: 'kohinoor@123',   role: 'butler',      name: 'Kohinoor Shinde', squad: 'Karjat'   },
+  'manoj@stayvista.com':         { id: '24e03c68-5cd0-47aa-a695-75850ac2a81d', password: 'manoj@123',      role: 'butler',      name: 'Manoj Valmiki',   squad: 'Lonavala' },
+  'nimish@stayvista.com':        { id: '326c84fa-7c94-42a4-b7a2-6545f1398308', password: 'nimish@123',     role: 'butler',      name: 'Nimish',          squad: 'Alibaug'  },
+  'butler@stayvista.com':        { id: '0835f144-513d-4107-968f-bb0c3ddbd6df', password: 'butler@123',     role: 'butler',      name: 'Ravi Kumar',      squad: 'Lonavala' },
+  'vinayak@stayvista.com':       { id: '4b2cc4e7-876b-490a-a315-192c67424328', password: 'vinayak@123',    role: 'butler',      name: 'Vinayak Kharade', squad: 'Lonavala' },
+  'vishal@stayvista.com':        { id: '4ab59e13-1d68-4607-bef8-b9fb013827ac', password: 'vishal@123',     role: 'butler',      name: 'Vishal',          squad: 'Karjat'   },
 }
 
 export default function LoginPage() {

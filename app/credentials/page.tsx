@@ -6,18 +6,19 @@ import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
 
 // ── App user accounts (from login page hardcoded list) ───────────────────────
+// Single source of truth — synced with app/login/page.tsx USERS
 const APP_ACCOUNTS = [
-  { name: 'Aditi',           email: 'admin@stayvista.com',         password: 'StayVista@2026', role: 'super_admin', squad: 'All' },
-  { name: 'Sujal',           email: 'sujal@stayvista.com',         password: 'sujal@123',      role: 'ops_manager', squad: 'All' },
-  { name: 'Sujal Uttekar',   email: 'sujal.uttekar@stayvista.com', password: 'StayVista@2026', role: 'butler',      squad: null },
-  { name: 'Atish Tandkar',   email: 'atish@stayvista.com',         password: 'atish@123',      role: 'butler',      squad: 'Nashik' },
-  { name: 'Kalpesh Ther',    email: 'kalpesh@stayvista.com',       password: 'kalpesh@123',    role: 'butler',      squad: 'Alibaug' },
-  { name: 'Kohinoor Shinde', email: 'kohinoor@stayvista.com',      password: 'kohinoor@123',   role: 'butler',      squad: 'Karjat' },
-  { name: 'Manoj Valmiki',   email: 'manoj@stayvista.com',         password: 'manoj@123',      role: 'butler',      squad: 'Lonavala' },
-  { name: 'Nimish',          email: 'nimish@stayvista.com',        password: 'nimish@123',     role: 'butler',      squad: 'Alibaug' },
-  { name: 'Ravi Kumar',      email: 'butler@stayvista.com',        password: 'butler@123',     role: 'butler',      squad: 'Lonavala' },
-  { name: 'Vinayak Kharade', email: 'vinayak@stayvista.com',       password: 'vinayak@123',    role: 'butler',      squad: 'Lonavala' },
-  { name: 'Vishal',          email: 'vishal@stayvista.com',        password: 'vishal@123',     role: 'butler',      squad: 'Karjat' },
+  { name: 'Aditi',           email: 'admin@stayvista.com',         password: 'StayVista@2026', role: 'super_admin', squad: 'All',      id: 'd035c01f-6987-4e76-8ab7-a562235ed2c8' },
+  { name: 'Sujal',           email: 'sujal@stayvista.com',         password: 'sujal@123',      role: 'ops_manager', squad: 'All',      id: '8d5da751-3269-4d77-b837-45253a9435c5' },
+  { name: 'Sujal Uttekar',   email: 'sujal.uttekar@stayvista.com', password: 'StayVista@2026', role: 'butler',      squad: null,       id: 'd71e6f0f-916d-4fec-af8d-d14113f70ae4' },
+  { name: 'Atish Tandkar',   email: 'atish@stayvista.com',         password: 'atish@123',      role: 'butler',      squad: 'Nashik',   id: 'fedb395e-476c-43d7-a76f-c87f8e508856' },
+  { name: 'Kalpesh Ther',    email: 'kalpesh@stayvista.com',       password: 'kalpesh@123',    role: 'butler',      squad: 'Alibaug',  id: '30ebc89e-17fc-43db-b9a8-46398d24a1e3' },
+  { name: 'Kohinoor Shinde', email: 'kohinoor@stayvista.com',      password: 'kohinoor@123',   role: 'butler',      squad: 'Karjat',   id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2' },
+  { name: 'Manoj Valmiki',   email: 'manoj@stayvista.com',         password: 'manoj@123',      role: 'butler',      squad: 'Lonavala', id: '24e03c68-5cd0-47aa-a695-75850ac2a81d' },
+  { name: 'Nimish',          email: 'nimish@stayvista.com',        password: 'nimish@123',     role: 'butler',      squad: 'Alibaug',  id: '326c84fa-7c94-42a4-b7a2-6545f1398308' },
+  { name: 'Ravi Kumar',      email: 'butler@stayvista.com',        password: 'butler@123',     role: 'butler',      squad: 'Lonavala', id: '0835f144-513d-4107-968f-bb0c3ddbd6df' },
+  { name: 'Vinayak Kharade', email: 'vinayak@stayvista.com',       password: 'vinayak@123',    role: 'butler',      squad: 'Lonavala', id: '4b2cc4e7-876b-490a-a315-192c67424328' },
+  { name: 'Vishal',          email: 'vishal@stayvista.com',        password: 'vishal@123',     role: 'butler',      squad: 'Karjat',   id: '4ab59e13-1d68-4607-bef8-b9fb013827ac' },
 ];
 
 const ROLE_COLORS: Record<string,{bg:string;color:string;label:string}> = {
