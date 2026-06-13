@@ -364,7 +364,17 @@ export default function DelightPage() {
       {reviewEntry && <PhotoReviewModal entry={reviewEntry} onClose={() => setReviewEntry(null)} onApprove={load} />}
 
       <Topbar title="Guest delight" subtitle="Photo evidence per booking"
-        actions={<button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowModal(true)}>+ Log activity</button>} />
+        actions={
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {isAdminOrSupervisor && (
+              <a href="https://drive.google.com/drive/folders/1ExnORyWbMXz9rGKA7vX7tECCVRizqMp_" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                <button className="sv-btn" style={{ fontSize: 12 }}>📁 Drive backup</button>
+              </a>
+            )}
+            <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowModal(true)}>+ Log activity</button>
+          </div>
+        }
+      />
 
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
