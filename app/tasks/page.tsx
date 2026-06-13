@@ -308,7 +308,9 @@ export default function TasksPage() {
                   {filtered.map(t => {
                     const tAny = t as any;
                     const isPending = t.status === 'pending';
-                    const villaName = t.notes?.replace('Villa: ', '').split(' · ')[0] || '—';
+                    // Extract villa name — notes format: "Butler: Name · ButlerID: uuid · Villa: VillaName"
+                    const villaMatch = t.notes?.match(/Villa: ([^·\n]+)/);
+                    const villaName = villaMatch ? villaMatch[1].trim() : (t.notes && !t.notes.startsWith('Butler:') ? t.notes.split(' · ')[0] : '—');
                     return (
                       <tr key={t.id}>
                         <td>
@@ -320,10 +322,20 @@ export default function TasksPage() {
                         {isSuper && (
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                              <div className="sv-avatar" style={{ width: 24, height: 24, fontSize: 9 }}>
-                                {(tAny.profiles?.name || '??').slice(0,2).toUpperCase()}
-                              </div>
-                              <span style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{tAny.profiles?.name ?? '—'}</span>
+                              {(() => {
+                                // Extract butler name from notes: "Butler: Name · ..."
+                                const nameMatch = t.notes?.match(/Butler: ([^·
+]+)/);
+                                const butlerName = nameMatch ? nameMatch[1].trim() : (tAny.profiles?.name || null);
+                                return (
+                                  <>
+                                    <div className="sv-avatar" style={{ width: 24, height: 24, fontSize: 9 }}>
+                                      {butlerName ? butlerName.slice(0,2).toUpperCase() : '?'}
+                                    </div>
+                                    <span style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{butlerName || '—'}</span>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </td>
                         )}
