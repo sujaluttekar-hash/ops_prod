@@ -54,6 +54,7 @@ export default function AllocationPage() {
   const [selections, setSelections] = useState<Record<string, string>>({}); // butlerId → booking type
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'daily' | 'monthly'>('daily');
   const [reportMonth, setReportMonth] = useState(new Date().getMonth());
@@ -160,6 +161,9 @@ export default function AllocationPage() {
 
     setSaved(newSaved);
     setSaving(false);
+    const saved = Object.values(newSaved).filter(Boolean).length;
+    setSaveMsg(`✅ Saved ${saved} of ${butlers.filter(b => selections[b.id]).length} allocations`);
+    setTimeout(() => setSaveMsg(''), 3000);
   }
 
   async function saveSingle(butler: any) {
@@ -215,6 +219,7 @@ export default function AllocationPage() {
                 {['All','Lonavala','Karjat','Nashik','Alibaug'].map(s => <option key={s}>{s}</option>)}
               </select>
             )}
+            {saveMsg && <span style={{ fontSize: 12, color: '#2D5A0E', fontWeight: 600 }}>{saveMsg}</span>}
             {view === 'daily' && isSuper && anyChanged && (
               <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={saveAll} disabled={saving}>
                 {saving ? 'Saving…' : '💾 Save all'}

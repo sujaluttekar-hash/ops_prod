@@ -143,10 +143,11 @@ export default function CredentialsPage() {
 
   async function toggleActive(email: string, currentStatus: boolean) {
     const db = dbProfiles.find(p => p.email === email);
-    if (!db) { alert('Profile not found in DB.'); return; }
+    if (!db) { alert('Profile not found in DB. User may not be in the database yet.'); return; }
     const { error } = await getServiceSupabase().from('profiles').update({ is_active: !currentStatus }).eq('id', db.id);
     if (error) { alert('Error: ' + error.message); return; }
-    await load();
+    // Refresh DB profiles so UI reflects the change immediately
+    setDbProfiles(prev => prev.map(p => p.id === db.id ? { ...p, is_active: !currentStatus } : p));
   }
 
   function copy(key: string, val: string) {

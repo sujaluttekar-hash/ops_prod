@@ -104,7 +104,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
             <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginTop: 4 }}>Butlers have been notified.</div>
           </div>
         ) : (
-          <form onSubmit={handleSave}>
+          <form onSubmit={handleSave} onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') e.preventDefault(); }}>
             {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
                 <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
                   <div>

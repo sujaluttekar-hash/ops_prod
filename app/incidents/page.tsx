@@ -84,7 +84,11 @@ function ReportModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   }
 
   async function handleSubmit() {
-    if (!form.villa || !form.description) { setError('Villa and description are required'); return; }
+    // Accept either selected villa from dropdown OR typed text
+    const villaValue = form.villa || villaSearch;
+    if (!villaValue || !form.description) { setError('Villa and description are required'); return; }
+    // Ensure form.villa is set
+    if (!form.villa && villaSearch) setForm(f => ({ ...f, villa: villaSearch }));
     setSaving(true); setError('');
     const sb = getServiceSupabase();
     const stored = typeof window !== 'undefined' ? localStorage.getItem('sv_local_session') : null;
@@ -113,7 +117,7 @@ function ReportModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     }
 
     const { error: err } = await sb.from('incidents').insert({
-      villa: form.villa,
+      villa: form.villa || villaSearch,
       category: form.category,
       severity: form.severity,
       description: form.description,

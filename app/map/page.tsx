@@ -378,19 +378,15 @@ export default function MapPage() {
                   { dot: '#FED5A9', label: 'Pending tasks', square: true, checked: showTasks, toggle: () => setShowTasks(v => !v) },
                   { dot: '#1B1D1F', label: `Butlers (${butlerLocations.length}) 🟢live 🔴offline`, circle: true, checked: showButlers, toggle: () => setShowButlers(v => !v) },
                 ].map(l => (
-                  <label key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}>
-                    <div style={{ position: 'relative', width: 18, height: 18, flexShrink: 0 }}>
-                      <input type="checkbox" checked={l.checked} onChange={l.toggle}
-                        style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', margin: 0 }} />
-                      <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${l.checked ? l.dot : 'rgba(0,0,0,0.2)'}`, background: l.checked ? l.dot : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', boxSizing: 'border-box' }}>
-                        {l.checked && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
-                      </div>
+                  <div key={l.label} onClick={l.toggle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${l.checked ? l.dot : 'rgba(0,0,0,0.2)'}`, background: l.checked ? l.dot : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}>
+                      {l.checked && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ width: 9, height: 9, borderRadius: (l as any).square ? 2 : '50%', background: l.dot, border: (l as any).circle ? '2px solid #97C459' : '1px solid rgba(0,0,0,0.15)', flexShrink: 0 }} />
                       <span style={{ color: l.checked ? '#1B1D1F' : '#aaa', fontWeight: l.checked ? 500 : 400, transition: 'color 0.15s' }}>{l.label}</span>
                     </div>
-                  </label>
+                  </div>
                 ))}
               </div>
 

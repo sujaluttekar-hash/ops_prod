@@ -73,7 +73,7 @@ export default function ReportsPage() {
   }
 
   function exportButlerPerformance() {
-    if (!butlerStats.length) { alert('Data still loading. Please wait.'); return; }
+    if (!butlerStats.length) { alert('No data yet. Make sure butlers have been assigned tasks and delights.'); return; }
     const csv = toCSV(
       ['Name','Squad','Role','Delights Done','Total Delights','Delight %','Avg Quiz Score','Huddles Attended','Total Huddles','Huddle %'],
       butlerStats.map(b => [
@@ -89,7 +89,7 @@ export default function ReportsPage() {
   }
 
   function exportAttendance() {
-    if (!trainings.length && !huddles.length) { alert('Data still loading.'); return; }
+    if (!trainings.length && !huddles.length) { alert('No training or huddle data found yet.'); return; }
     const csv = toCSV(
       ['Type','Name/Team','Date','Status','Expected','Attended'],
       [
