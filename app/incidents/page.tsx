@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { getServiceSupabase, LOCAL_PROFILES } from '@/lib/supabase';
+import { PROPERTIES } from '@/lib/properties-data';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
 
@@ -65,6 +66,9 @@ function useVoiceRecorder() {
 function ReportModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { user } = useAuth();
   const [form, setForm] = useState({ villa: '', category: CATEGORIES[0], severity: 'medium', description: '' });
+  const [villaSearch, setVillaSearch] = useState('');
+  const [showVillaList, setShowVillaList] = useState(false);
+  const villaRef = useRef<HTMLDivElement>(null);
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -149,9 +153,30 @@ function ReportModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         {error && <div style={{ background: 'rgba(233,160,167,0.15)', border: '1px solid #E9A0A7', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
 
         {/* Villa */}
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 12, position: 'relative' }} ref={villaRef}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Villa / Location *</div>
-          <input className="sv-input" style={{ width: '100%' }} placeholder="e.g. Casa Enchante, Lonavala" value={form.villa} onChange={e => setForm(f => ({ ...f, villa: e.target.value }))} />
+          <input className="sv-input" style={{ width: '100%' }}
+            placeholder="Search villa name…"
+            value={villaSearch || form.villa}
+            onChange={e => { setVillaSearch(e.target.value); setShowVillaList(true); setForm(f => ({ ...f, villa: '' })); }}
+            onFocus={() => setShowVillaList(true)}
+          />
+          {showVillaList && villaSearch.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
+              {PROPERTIES.filter((p: any) => p.name.toLowerCase().includes(villaSearch.toLowerCase())).slice(0, 12).map((p: any) => (
+                <div key={p.id} onClick={() => { setForm(f => ({ ...f, villa: p.name })); setVillaSearch(p.name); setShowVillaList(false); }}
+                  style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, borderBottom: '0.5px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--muted)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: p.squad === 'Lonavala' ? 'rgba(156,204,252,0.15)' : 'rgba(151,196,89,0.12)', color: p.squad === 'Lonavala' ? '#0C447C' : '#2D5A0E' }}>{p.squad}</span>
+                  {p.name}
+                </div>
+              ))}
+              {PROPERTIES.filter((p: any) => p.name.toLowerCase().includes(villaSearch.toLowerCase())).length === 0 && (
+                <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--muted-fg)' }}>No villa found — type to search</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Category + Severity */}
@@ -286,7 +311,7 @@ export default function IncidentsPage() {
         </div>
       )}
 
-      <Topbar title="Incidents" subtitle={isSuper ? `${openCount} open · ${critCount > 0 ? critCount + ' critical' : 'all clear'}` : 'Report and track villa incidents'}
+      <Topbar title="Cases" subtitle={isSuper ? `${openCount} open · ${critCount > 0 ? critCount + ' critical' : 'all clear'}` : 'Report and track villa incidents'}
         actions={
           <button className="sv-btn" style={{ fontSize: 12, background: '#8B0000', color: '#fff', border: 'none' }} onClick={() => setShowReport(true)}>
             🆘 Report incident
@@ -336,8 +361,8 @@ export default function IncidentsPage() {
         ) : filtered.length === 0 ? (
           <div style={{ padding: 60, textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>No incidents</div>
-            <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginTop: 4 }}>{isSuper ? 'All clear.' : 'Tap "Report incident" if something needs attention.'}</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>No cases</div>
+            <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginTop: 4 }}>{isSuper ? 'All clear.' : 'Tap "Report case" if something needs attention.'}</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
