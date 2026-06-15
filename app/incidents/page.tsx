@@ -84,64 +84,81 @@ function ReportModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   }
 
   async function handleSubmit() {
-    // Accept either selected villa from dropdown OR typed text
     const villaValue = form.villa || villaSearch;
     if (!villaValue || !form.description) { setError('Villa and description are required'); return; }
-    // Ensure form.villa is set
-    if (!form.villa && villaSearch) setForm(f => ({ ...f, villa: villaSearch }));
     setSaving(true); setError('');
     const sb = getServiceSupabase();
     const stored = typeof window !== 'undefined' ? localStorage.getItem('sv_local_session') : null;
     const u = stored ? JSON.parse(stored) : user;
 
-    // Upload photo if attached
-    let photoUrl: string | null = null;
-    if (photo) {
-      const path = `incidents/${Date.now()}_${photo.name}`;
-      const { data, error: upErr } = await sb.storage.from('delight-photos').upload(path, photo, { upsert: true });
-      if (!upErr && data) {
-        const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(data.path);
-        photoUrl = publicUrl;
+    try {
+      // Upload photo
+      let photoUrl: string | null = null;
+      if (photo) {
+        try {
+          const path = `incidents/${Date.now()}_${photo.name}`;
+          const { data } = await sb.storage.from('delight-photos').upload(path, photo, { upsert: true });
+          if (data) {
+            const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(data.path);
+            photoUrl = publicUrl;
+          }
+        } catch {} // photo upload failure is non-blocking
       }
-    }
 
-    // Upload voice note if recorded
-    let voiceUrl: string | null = null;
-    if (voice.audioBlob) {
-      const path = `incidents/voice_${Date.now()}.webm`;
-      const { data, error: vErr } = await sb.storage.from('delight-photos').upload(path, voice.audioBlob, { upsert: true, contentType: 'audio/webm' });
-      if (!vErr && data) {
-        const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(data.path);
-        voiceUrl = publicUrl;
+      // Upload voice note
+      let voiceUrl: string | null = null;
+      if (voice.audioBlob) {
+        try {
+          const path = `incidents/voice_${Date.now()}.webm`;
+          const { data } = await sb.storage.from('delight-photos').upload(path, voice.audioBlob, { upsert: true, contentType: 'audio/webm' });
+          if (data) {
+            const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(data.path);
+            voiceUrl = publicUrl;
+          }
+        } catch {} // voice upload failure is non-blocking
       }
+
+      const { error: err } = await sb.from('incidents').insert({
+        villa: villaValue,
+        category: form.category,
+        severity: form.severity,
+        description: form.description,
+        reported_by: u?.name || 'Butler',
+        reporter_id: u?.id || null,
+        squad: u?.squad || null,
+        photo_url: photoUrl,
+        voice_url: voiceUrl,
+        status: 'open',
+      });
+
+      if (err) {
+        // Table might not exist yet — show clear message
+        if (err.code === '42P01' || err.message?.includes('does not exist')) {
+          setError('⚠ Database table not set up yet. Ask admin to run the SQL setup. Error: ' + err.message);
+        } else {
+          setError(err.message);
+        }
+        setSaving(false);
+        return;
+      }
+
+      // Notify admin (non-blocking)
+      sb.from('profiles').select('id').in('role', ['super_admin', 'ops_manager'])
+        .then(({ data: admins }) => {
+          if (admins?.length) {
+            sb.from('notifications').insert(admins.map((a: any) => ({
+              user_id: a.id, title: `🆘 Incident at ${villaValue}`,
+              body: `${form.category} · ${form.severity.toUpperCase()} · ${u?.name}`,
+              type: 'task', read: false,
+            }))).catch(() => {});
+          }
+        }).catch(() => {});
+
+      onSaved(); onClose();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to submit. Please try again.');
+      setSaving(false);
     }
-
-    const { error: err } = await sb.from('incidents').insert({
-      villa: form.villa || villaSearch,
-      category: form.category,
-      severity: form.severity,
-      description: form.description,
-      reported_by: u?.name || 'Butler',
-      reporter_id: u?.id || null,
-      squad: u?.squad || null,
-      photo_url: photoUrl,
-      voice_url: voiceUrl,
-      status: 'open',
-    });
-
-    if (err) { setError(err.message); setSaving(false); return; }
-
-    // Notify admin
-    const { data: admins } = await sb.from('profiles').select('id').in('role', ['super_admin', 'ops_manager']);
-    if (admins?.length) {
-      await sb.from('notifications').insert(admins.map((a: any) => ({
-        user_id: a.id, title: `🆘 Incident at ${form.villa}`,
-        body: `${form.category} — ${form.severity.toUpperCase()} — reported by ${u?.name}`,
-        type: 'task', read: false,
-      }))).catch(() => {});
-    }
-
-    onSaved(); onClose();
   }
 
   const sevStyle = SEVERITY[form.severity];
@@ -154,7 +171,11 @@ function ReportModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
         </div>
         <div className="sv-strip" style={{ marginBottom: 18 }} />
-        {error && <div style={{ background: 'rgba(233,160,167,0.15)', border: '1px solid #E9A0A7', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
+        {error && (
+          <div style={{ background: 'rgba(233,160,167,0.15)', border: '1px solid #E9A0A7', borderRadius: 8, padding: '12px 14px', fontSize: 12, color: '#8B2020', marginBottom: 14, lineHeight: 1.5, wordBreak: 'break-word' }}>
+            ⚠ {error}
+          </div>
+        )}
 
         {/* Villa */}
         <div style={{ marginBottom: 12, position: 'relative' }} ref={villaRef}>
@@ -273,8 +294,11 @@ export default function IncidentsPage() {
     const sb = getServiceSupabase();
     const stored = typeof window !== 'undefined' ? localStorage.getItem('sv_local_session') : null;
     const u = stored ? JSON.parse(stored) : user;
+    const stored2 = typeof window !== 'undefined' ? localStorage.getItem('sv_local_session') : null;
+    const localUser = stored2 ? JSON.parse(stored2) : null;
     let q = sb.from('incidents').select('*').order('created_at', { ascending: false });
-    if (!isSuper) q = q.eq('reporter_id', u?.id);
+    // Butlers ONLY see their own incidents — strict filter
+    if (!isSuper && localUser?.id) q = q.eq('reporter_id', localUser.id);
     const { data } = await q;
     setIncidents(data || []);
     setLoading(false);
