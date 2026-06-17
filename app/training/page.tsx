@@ -98,8 +98,8 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
                   {form.has_quiz ? '✓' : ''}
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>Attach a quiz</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>Butler scores will be tracked against this training.</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>Attach a test</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>Butlers will take a test after this training session.</div>
                 </div>
               </div>
             </div>
@@ -308,7 +308,7 @@ export default function TrainingPage() {
                     <th>Type</th>
                     <th>Seats</th>
                     <th>Status</th>
-                    <th>Quiz</th>
+                    <th>Test</th>
                     {isSuper && <th>Actions</th>}
                   </tr>
                 </thead>
@@ -330,7 +330,7 @@ export default function TrainingPage() {
                       <td><span className={getStatusBadge(t.status)}>{getStatusLabel(t.status)}</span></td>
                       <td>
                         {t.has_quiz
-                          ? <span className="badge badge-blue">Yes</span>
+                          ? <span className="badge badge-blue">Has test</span>
                           : <span style={{ color: 'var(--muted-fg)' }}>—</span>}
                       </td>
                       {isSuper && (
