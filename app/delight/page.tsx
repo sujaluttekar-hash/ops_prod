@@ -280,7 +280,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
 }
 
 // ── Entry card ────────────────────────────────────────────────
-function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId }: { entry: any; onEdit: () => void; onAcknowledge: () => void; canAcknowledge: boolean; currentUserId: string }) {
+function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, canAcknowledge, currentUserId }: { entry: any; onEdit: () => void; onAcknowledge: () => void; onUnacknowledge: () => void; canAcknowledge: boolean; currentUserId: string }) {
   const [expanded, setExpanded] = useState(false);
   const acks = entry.acknowledged_by || [];
   const hasAcked = acks.includes(currentUserId);
@@ -304,7 +304,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 14, fontWeight: 700 }}>🏡 {entry.villa_name || '—'}</span>
             <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sm.bg, color: sm.color }}>{sm.label}</span>
-            {ackCount > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(151,196,89,0.12)', color: '#2D5A0E' }}>✅ {ackCount}/2 ack</span>}
+            {ackCount > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(151,196,89,0.12)', color: '#2D5A0E' }}>✅ Acknowledged</span>}
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
             {entry.your_name} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
@@ -312,12 +312,15 @@ function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {canAcknowledge && !isCompleted && (
-            !hasAcked ? (
+!hasAcked ? (
               <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '5px 12px', background: '#0C447C', borderColor: '#0C447C' }} onClick={onAcknowledge}>
-                ✅ Acknowledge {ackCount > 0 ? `(${ackCount}/2)` : ''}
+                ✅ Acknowledge
               </button>
             ) : (
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#2D5A0E', padding: '5px 10px', background: 'rgba(151,196,89,0.12)', borderRadius: 8 }}>✅ Acknowledged</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#2D5A0E', padding: '5px 10px', background: 'rgba(151,196,89,0.12)', borderRadius: 8 }}>✅ Acknowledged</span>
+                <button className="sv-btn" style={{ fontSize: 10, padding: '4px 8px', color: '#7A4A08', borderColor: '#FED5A9' }} onClick={onUnacknowledge}>↩ Undo</button>
+              </div>
             )
           )}
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={onEdit}>✏️ Edit</button>
@@ -351,7 +354,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId
           </div>
 
           <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted-fg)' }}>
-            {ackCount === 0 ? 'No acknowledgements yet · needs 2 to complete' : ackCount === 1 ? '1/2 acknowledged · needs 1 more' : '✅ Fully acknowledged'}
+            {ackCount === 0 ? 'Not acknowledged yet — admin or supervisor can acknowledge' : '✅ Acknowledged'}
           </div>
         </div>
       )}
@@ -412,9 +415,13 @@ export default function DelightPage() {
     const acks: string[] = entry.acknowledged_by || [];
     if (acks.includes(userId)) return;
     const newAcks = [...acks, userId];
-    const newStatus = newAcks.length >= 2 ? 'completed' : 'pending';
-    await getServiceSupabase().from('guest_delights').update({ acknowledged_by: newAcks, status: newStatus }).eq('id', entryId);
-    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, acknowledged_by: newAcks, status: newStatus } : e));
+    await getServiceSupabase().from('guest_delights').update({ acknowledged_by: newAcks, status: 'completed' }).eq('id', entryId);
+    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, acknowledged_by: newAcks, status: 'completed' } : e));
+  }
+
+  async function handleUnacknowledge(entryId: string) {
+    await getServiceSupabase().from('guest_delights').update({ acknowledged_by: [], status: 'pending' }).eq('id', entryId);
+    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, acknowledged_by: [], status: 'pending' } : e));
   }
 
   const filtered = entries.filter(e => {
@@ -505,6 +512,7 @@ export default function DelightPage() {
               <EntryCard key={entry.id} entry={entry}
                 onEdit={() => setEditEntry(entry)}
                 onAcknowledge={() => handleAcknowledge(entry.id)}
+                onUnacknowledge={() => handleUnacknowledge(entry.id)}
                 canAcknowledge={isSuper}
                 currentUserId={localUser.id || ''}
               />
