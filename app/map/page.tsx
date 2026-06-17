@@ -288,9 +288,9 @@ export default function MapPage() {
         .sv-map-tooltip::before { border-top-color: #1B1D1F !important; }
         .leaflet-control-attribution { display: none; }
         @media (max-width: 768px) {
-          .map-layout { flex-direction: column !important; height: auto !important; min-height: unset !important; }
-          .map-sidebar { width: 100% !important; height: 200px !important; border-right: none !important; border-bottom: 1px solid rgba(0,0,0,0.08) !important; overflow-y: auto !important; }
-          .map-container { height: 52vh !important; min-height: 300px !important; }
+          .map-layout { flex-direction: column !important; height: auto !important; min-height: unset !important; border-radius: 10px !important; }
+          .map-sidebar { width: 100% !important; max-height: 180px !important; height: auto !important; border-right: none !important; border-bottom: 1px solid rgba(0,0,0,0.08) !important; overflow-y: auto !important; order: 2; }
+          .map-tile { width: 100% !important; height: 55vh !important; min-height: 280px !important; order: 1; }
           .map-legend { display: none !important; }
         }
       `}</style>
