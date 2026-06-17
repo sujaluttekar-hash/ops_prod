@@ -312,16 +312,15 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, canAcknowled
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {canAcknowledge && (
-            !hasAcked && !isCompleted ? (
+            isCompleted ? (
+              <button className="sv-btn" style={{ fontSize: 11, padding: '5px 10px', color: '#7A4A08', borderColor: '#FED5A9', background: 'rgba(254,213,169,0.15)' }} onClick={onUnacknowledge}>
+                ↩ Move to pending
+              </button>
+            ) : (
               <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '5px 12px', background: '#0C447C', borderColor: '#0C447C' }} onClick={onAcknowledge}>
                 ✅ Acknowledge
               </button>
-            ) : isCompleted ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#2D5A0E', padding: '5px 10px', background: 'rgba(151,196,89,0.12)', borderRadius: 8 }}>✅ Acknowledged</span>
-                <button className="sv-btn" style={{ fontSize: 10, padding: '4px 8px', color: '#7A4A08', borderColor: '#FED5A9' }} onClick={onUnacknowledge}>↩ Undo</button>
-              </div>
-            ) : null
+            )
           )}
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={onEdit}>✏️ Edit</button>
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setExpanded(v => !v)}>
