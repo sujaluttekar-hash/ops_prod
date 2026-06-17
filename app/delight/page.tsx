@@ -158,24 +158,16 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         const { data: upData } = await sb.storage.from('delight-photos').upload(path, p.file, { upsert: true });
         if (upData) {
           const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(upData.path);
-          // Save to delight_photos table with subtype metadata
-          // Try with new columns first, fallback to basic columns
-          const photoRow: any = {
-            delight_id: entryId, pointer_key: cat.key,
-            storage_path: path, public_url: publicUrl,
-          };
-          // Add new columns only if they exist (graceful degradation)
-          try {
-            const { error: upErr } = await sb.from('delight_photos').upsert(
-              { ...photoRow, subtypes: subtypes[cat.key] || [], uploaded_at: new Date().toISOString() },
-              { onConflict: 'delight_id,pointer_key' }
-            );
-            if (upErr) {
-              // Fallback: insert without new columns
-              await sb.from('delight_photos').upsert(photoRow, { onConflict: 'delight_id,pointer_key' });
-            }
-          } catch {
-            await sb.from('delight_photos').upsert(photoRow, { onConflict: 'delight_id,pointer_key' });
+          // Delete existing photo for this category then insert fresh (avoids upsert constraint issues)
+          await sb.from('delight_photos').delete().eq('delight_id', entryId).eq('pointer_key', cat.key);
+          const { error: insErr } = await sb.from('delight_photos').insert({
+            delight_id: entryId,
+            pointer_key: cat.key,
+            storage_path: path,
+            public_url: publicUrl,
+          });
+          if (insErr) {
+            console.error('Photo save error:', insErr.message);
           }
         }
       }
