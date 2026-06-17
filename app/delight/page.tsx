@@ -1,374 +1,410 @@
 'use client';
-import { PROPERTIES } from '@/lib/properties-data';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/layout/Topbar';
-import { fetchGuestDelights, insertGuestDelight, uploadDelightPhoto, getSupabase, getServiceSupabase, BUCKETS, type GuestDelight } from '@/lib/supabase';
-import { getCurrentUser, isSupervisor, type AppUser } from '@/lib/auth';
-import { getStatusBadge, getStatusLabel } from '@/lib/utils';
+import { getServiceSupabase, BUCKETS } from '@/lib/supabase';
+import { PROPERTIES } from '@/lib/properties-data';
+import { useAuth } from '@/lib/auth-context';
+import { isSupervisor } from '@/lib/auth';
 
-const PHOTO_POINTERS = [
-  { key: 'arrival_selfie', label: 'Arrival selfie', emoji: '🤳', note: 'With timestamp' },
-  { key: 'guest_welcome',  label: 'Guest welcome',  emoji: '🙏', note: '' },
-  { key: 'table_layout',   label: 'Table layout',   emoji: '🍽', note: 'Breakfast / Lunch / Dinner' },
-  { key: 'guest_delight',  label: 'Guest delight',  emoji: '🎁', note: 'Low / zero cost' },
-  { key: 'exit_selfie',    label: 'Exit selfie',    emoji: '👋', note: 'With timestamp' },
-  { key: 'experience',     label: 'Experiences',    emoji: '✨', note: 'Sit-down dinner / BBQ / birthday decor' },
-  { key: 'feedback',       label: 'Feedback',       emoji: '⭐', note: '5 star / 7 star' },
+// ── Categories ────────────────────────────────────────────────
+const CATEGORIES = [
+  { key: 'arrival_selfie', emoji: '🤳', label: 'Arrival selfie',  note: 'With timestamp', subtypes: [] },
+  { key: 'guest_welcome',  emoji: '🙏', label: 'Guest welcome',   note: '',               subtypes: [] },
+  { key: 'table_layout',   emoji: '🍽', label: 'Table layout',    note: 'Meal type',      subtypes: ['Breakfast','Lunch','Dinner','Hi-tea','Cocktails'] },
+  { key: 'guest_delight',  emoji: '🎁', label: 'Guest delight',   note: 'Low / zero cost',subtypes: ['Room decor','Welcome note','Fresh flowers','Fruit basket','Other'] },
+  { key: 'exit_selfie',    emoji: '👋', label: 'Exit selfie',     note: 'With timestamp', subtypes: [] },
+  { key: 'experience',     emoji: '✨', label: 'Experiences',     note: 'Special moments',subtypes: ['Sit-down dinner','BBQ / bonfire','Birthday decor','Anniversary','Picnic setup','Other'] },
+  { key: 'feedback',       emoji: '⭐', label: 'Feedback',        note: '5★ / 7★',        subtypes: ['5 star','7 star'] },
 ];
 
-const BOOKING_TYPES = ['Check in','Check out','Booking (full day)','Non Booking Task','Booking','Non Booking'];
-
+const BOOKING_TYPES = ['Check in','Check out','Booking (full day)','Non Booking Task'];
 type PhotoVal = { file: File; preview: string; timestamp: string } | null;
-type PhotoMap = Record<string, PhotoVal>;
 
-// ── Photo upload cell ────────────────────────────────────────
-function PhotoCell({ pointer, value, onChange }: { pointer: typeof PHOTO_POINTERS[0]; value: PhotoVal; onChange: (v: PhotoVal) => void }) {
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
-
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    const ts = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true });
-    reader.onload = ev => onChange({ file, preview: ev.target?.result as string, timestamp: ts });
-    reader.readAsDataURL(file);
-  }
-
+// ── Villa search ──────────────────────────────────────────────
+function VillaSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [q, setQ] = useState(value);
+  const [open, setOpen] = useState(false);
+  const results = q.length > 0 ? PROPERTIES.filter((p: any) => p.name.toLowerCase().includes(q.toLowerCase())).slice(0, 10) : [];
   return (
-    <div style={{ border: `1.5px dashed ${value ? '#97C459' : 'rgba(0,0,0,0.13)'}`, borderRadius: 10, padding: value ? 8 : 12, background: value ? 'rgba(151,196,89,0.05)' : 'transparent', minHeight: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', transition: 'all 0.15s' }}>
-      {/* Hidden inputs */}
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
-      <input ref={galleryRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
-
-      {value ? (
-        <>
-          <img src={value.preview} alt="" style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 7 }} />
-          <div style={{ fontSize: 10, color: '#2D5A0E', fontWeight: 600 }}>✓ {value.timestamp}</div>
-          <button type="button" onClick={() => onChange(null)} style={{ fontSize: 10, color: '#8B2020', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Remove</button>
-        </>
-      ) : (
-        <>
-          <div style={{ fontSize: 22 }}>{pointer.emoji}</div>
-          <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>{pointer.label}</div>
-          {pointer.note && <div style={{ fontSize: 10, color: 'var(--muted-fg)' }}>{pointer.note}</div>}
-          {/* Two upload options */}
-          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-            <button type="button"
-              onClick={() => cameraRef.current?.click()}
-              style={{ fontSize: 11, padding: '5px 10px', background: '#1B1D1F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              📷 Camera
-            </button>
-            <button type="button"
-              onClick={() => galleryRef.current?.click()}
-              style={{ fontSize: 11, padding: '5px 10px', background: 'var(--muted)', color: 'var(--sv-dark)', border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              🖼 Gallery
-            </button>
-          </div>
-        </>
+    <div style={{ position: 'relative' }}>
+      <input className="sv-input" style={{ width: '100%' }} placeholder="Search villa…" value={q}
+        onChange={e => { setQ(e.target.value); onChange(''); setOpen(true); }}
+        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 180)} />
+      {open && results.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, boxShadow: '0 8px 20px rgba(0,0,0,0.12)', maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
+          {results.map((p: any) => (
+            <div key={p.id} onMouseDown={() => { setQ(p.name); onChange(p.name); setOpen(false); }}
+              style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '0.5px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.squad === 'Lonavala' ? '#9CCCFC' : '#97C459', flexShrink: 0 }} />
+              <div><div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div><div style={{ fontSize: 10, color: 'var(--muted-fg)' }}>{p.squad}</div></div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-// ── Add delight modal ────────────────────────────────────────
-function AddDelightModal({ user, onClose, onSaved }: { user: AppUser | null; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ your_name: user?.name ?? '', squad: user?.squad ?? '', booking_date: '', booking_id: '', villa_name: '', booking_type: '' });
-  const [photos, setPhotos] = useState<PhotoMap>(Object.fromEntries(PHOTO_POINTERS.map(p => [p.key, null])));
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
-  const f = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
+// ── Category card in modal ────────────────────────────────────
+function CategoryCard({ cat, photo, subtypes, onPhoto, onSubtype }: { cat: typeof CATEGORIES[0]; photo: PhotoVal; subtypes: string[]; onPhoto: (v: PhotoVal) => void; onSubtype: (s: string) => void }) {
+  const camRef = useRef<HTMLInputElement>(null);
+  const galRef = useRef<HTMLInputElement>(null);
+  const hasPhoto = !!photo;
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true); setError('');
-    try {
-      if (!form.villa_name) { setError('Please select a villa from the dropdown.'); setSaving(false); return; }
-      const { data, error: insertErr } = await insertGuestDelight({ your_name: form.your_name, squad: form.squad, booking_date: form.booking_date, booking_id: form.booking_id || null, villa_name: form.villa_name, booking_type: form.booking_type, status: 'pending' });
-      if (insertErr) throw new Error(insertErr.message);
-      if (data?.id) {
-        let uploadCount = 0;
-        for (const p of PHOTO_POINTERS) {
-          const photo = photos[p.key];
-          if (photo) {
-            const { error: upErr } = await uploadDelightPhoto(data.id, p.key, photo.file, photo.timestamp);
-            if (!upErr) uploadCount++;
-          }
-        }
-        // Auto-complete if all 7 photos uploaded
-        if (uploadCount === PHOTO_POINTERS.length) {
-          await getServiceSupabase().from('guest_delights').update({ status: 'completed' }).eq('id', data.id);
-        }
-      }
-      setSaved(true);
-      setTimeout(() => { onSaved(); onClose(); }, 800);
-    } catch (err: any) { setError(err.message ?? 'Failed to save'); setSaving(false); }
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    onPhoto({ file: f, preview: URL.createObjectURL(f), timestamp: new Date().toISOString() });
+    e.target.value = '';
+  }
+
+  return (
+    <div style={{ borderRadius: 12, border: `1.5px solid ${hasPhoto ? '#97C459' : 'rgba(0,0,0,0.08)'}`, padding: 14, background: hasPhoto ? 'rgba(151,196,89,0.04)' : '#fff', transition: 'all 0.15s' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: cat.subtypes.length > 0 || hasPhoto ? 10 : 0 }}>
+        <span style={{ fontSize: 22, lineHeight: 1.3 }}>{cat.emoji}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sv-dark)' }}>{cat.label}</div>
+          {cat.note && <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 1 }}>{cat.note}</div>}
+        </div>
+        {hasPhoto && <span style={{ fontSize: 16 }}>✅</span>}
+      </div>
+
+      {/* Subtypes */}
+      {cat.subtypes.length > 0 && (
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
+          {cat.subtypes.map(s => (
+            <button key={s} type="button" onClick={() => onSubtype(s)}
+              style={{ fontSize: 10.5, padding: '3px 9px', borderRadius: 20, border: `1.5px solid ${subtypes.includes(s) ? '#9CCCFC' : 'rgba(0,0,0,0.1)'}`, background: subtypes.includes(s) ? 'rgba(156,204,252,0.15)' : 'white', color: subtypes.includes(s) ? '#0C447C' : 'var(--muted-fg)', cursor: 'pointer', fontWeight: subtypes.includes(s) ? 700 : 400 }}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Photo preview */}
+      {hasPhoto && (
+        <div style={{ position: 'relative', marginBottom: 8 }}>
+          <img src={photo!.preview} style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 8, border: '1px solid #97C459' }} />
+          <button type="button" onClick={() => onPhoto(null)} style={{ position: 'absolute', top: 6, right: 6, background: '#fff', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, fontWeight: 700, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}>✕</button>
+          <div style={{ position: 'absolute', bottom: 6, left: 8, fontSize: 9, color: '#fff', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: 4 }}>
+            {new Date(photo!.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+      )}
+
+      {/* Upload buttons */}
+      <input ref={camRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: 'none' }} />
+      <input ref={galRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button type="button" onClick={() => camRef.current?.click()} className="sv-btn" style={{ flex: 1, fontSize: 11, padding: '5px 0' }}>📷 {hasPhoto ? 'Retake' : 'Camera'}</button>
+        <button type="button" onClick={() => galRef.current?.click()} className="sv-btn" style={{ flex: 1, fontSize: 11, padding: '5px 0' }}>🖼 Gallery</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Log / Edit Modal ──────────────────────────────────────────
+function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: any; onClose: () => void; onSaved: () => void; defaultUser: any }) {
+  const isEdit = !!editEntry;
+  const [form, setForm] = useState({
+    your_name: editEntry?.your_name || defaultUser?.name || '',
+    squad: editEntry?.squad || defaultUser?.squad || '',
+    booking_date: editEntry?.booking_date || '',
+    booking_id: editEntry?.booking_id || '',
+    villa_name: editEntry?.villa_name || '',
+    booking_type: editEntry?.booking_type || '',
+  });
+  const [photos, setPhotos] = useState<Record<string, PhotoVal>>(Object.fromEntries(CATEGORIES.map(c => [c.key, null])));
+  const [subtypes, setSubtypes] = useState<Record<string, string[]>>(Object.fromEntries(CATEGORIES.map(c => [c.key, []])));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const f = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
+
+  function toggleSubtype(catKey: string, s: string) {
+    setSubtypes(prev => {
+      const cur = prev[catKey] || [];
+      return { ...prev, [catKey]: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s] };
+    });
   }
 
   const uploadedCount = Object.values(photos).filter(Boolean).length;
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 18, padding: 28, width: '100%', maxWidth: 640, boxShadow: '0 32px 80px rgba(0,0,0,0.2)', marginTop: 20, marginBottom: 20 }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-          <div><div style={{ fontSize: 16, fontWeight: 700 }}>Log butler activity</div><div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>Booking details + photo evidence</div></div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
-        </div>
-        <div className="sv-strip" style={{ marginBottom: 22 }} />
-        {saved ? (
-          <div style={{ textAlign: 'center', padding: '32px 0' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Saved!</div>
-            <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginTop: 4 }}>{uploadedCount} photo{uploadedCount !== 1 ? 's' : ''} uploaded</div>
-          </div>
-        ) : (
-          <form onSubmit={handleSave}>
-            {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>Booking details</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-              {([['your_name','Your name *','text','e.g. Ravi Kumar',true],['squad','Your squad *','text','e.g. Lonavala',true],['booking_date','Booking date *','date','',true],['booking_id','Booking ID','text','BK-2026-04821',false]] as any[]).map(([key,label,type,ph,req]) => (
-                <div key={key}>
-                  <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>{label}</div>
-                  <input className="sv-input" style={{ width: '100%' }} type={type} placeholder={ph} value={(form as any)[key]} onChange={f(key)} required={req} />
-                </div>
-              ))}
-              <div>
-                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking type *</div>
-                {/* Villa search dropdown */}
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 5 }}>Villa name *</label>
-                  <DelightVillaSearch value={form.villa_name} onChange={v => setForm(f => ({ ...f, villa_name: v }))} squad={form.squad} />
-                </div>
-                <select className="sv-select" style={{ width: '100%' }} value={form.booking_type} onChange={f('booking_type')} required>
-                  <option value="">Select type</option>
-                  {BOOKING_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>Photo evidence</div>
-              <span className={`badge ${uploadedCount > 0 ? 'badge-green' : 'badge-gray'}`}>{uploadedCount}/{PHOTO_POINTERS.length} uploaded</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: 10, marginBottom: 22 }}>
-              {PHOTO_POINTERS.map(p => <PhotoCell key={p.key} pointer={p} value={photos[p.key]} onChange={v => setPhotos(prev => ({ ...prev, [p.key]: v }))} />)}
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
-              <button type="submit" className="sv-btn sv-btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Submit entry'}</button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
+  async function handleSave() {
+    if (!form.villa_name) { setError('Please select a villa'); return; }
+    if (!form.booking_date) { setError('Please set a booking date'); return; }
+    if (uploadedCount === 0 && !isEdit) { setError('Please upload at least one photo'); return; }
+    setSaving(true); setError('');
+    const sb = getServiceSupabase();
 
-// ── Photo review modal (admin/supervisor) ────────────────────
-function PhotoReviewModal({ entry, onClose, onApprove }: { entry: GuestDelight; onClose: () => void; onApprove: () => void }) {
-  const photos = entry.delight_photos ?? [];
-  const sb = getServiceSupabase();
+    try {
+      let entryId = editEntry?.id;
 
-  async function handleApprove() {
-    await sb.from('guest_delights').update({ status: 'completed' }).eq('id', entry.id);
-    onApprove();
-    onClose();
+      if (!isEdit) {
+        // Create new entry
+        const { data, error: insertErr } = await sb.from('guest_delights').insert({
+          your_name: form.your_name, squad: form.squad, booking_date: form.booking_date,
+          booking_id: form.booking_id || null, villa_name: form.villa_name,
+          booking_type: form.booking_type, status: 'in_progress',
+        }).select().single();
+        if (insertErr) throw new Error(insertErr.message);
+        entryId = data.id;
+      }
+
+      // Upload new photos
+      for (const cat of CATEGORIES) {
+        const p = photos[cat.key];
+        if (!p) continue;
+        const path = `${entryId}/${cat.key}_${Date.now()}.jpg`;
+        const { data: upData } = await sb.storage.from('delight-photos').upload(path, p.file, { upsert: true });
+        if (upData) {
+          const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(upData.path);
+          // Save to delight_photos table with subtype metadata
+          await sb.from('delight_photos').upsert({
+            delight_id: entryId, pointer_key: cat.key,
+            storage_path: path, public_url: publicUrl,
+            subtypes: subtypes[cat.key] || [],
+            uploaded_at: new Date().toISOString(),
+          }, { onConflict: 'delight_id,pointer_key' });
+        }
+      }
+
+      // If editing, update form fields too
+      if (isEdit) {
+        await sb.from('guest_delights').update({
+          your_name: form.your_name, squad: form.squad, booking_date: form.booking_date,
+          booking_id: form.booking_id || null, villa_name: form.villa_name,
+          booking_type: form.booking_type,
+        }).eq('id', entryId);
+      }
+
+      onSaved(); onClose();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save');
+      setSaving(false);
+    }
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 16px', overflowY: 'auto' }} onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 18, padding: 28, width: '100%', maxWidth: 720, boxShadow: '0 32px 80px rgba(0,0,0,0.3)', marginTop: 20, marginBottom: 20 }} onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Photo review — {entry.your_name}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 2 }}>
-              {entry.villa_name} · {entry.booking_type} · {entry.booking_date ? new Date(entry.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-            </div>
-          </div>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{isEdit ? '✏️ Edit delight' : '🎁 Log guest delight'}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
         </div>
-        <div className="sv-strip" style={{ marginBottom: 20 }} />
+        <div className="sv-strip" style={{ marginBottom: 18 }} />
 
-        {/* Booking info */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 20 }}>
-          {[
-            { label: 'Butler', value: entry.your_name },
-            { label: 'Squad', value: entry.squad ?? '—' },
-            { label: 'Booking ID', value: entry.booking_id ?? '—' },
-            { label: 'Villa', value: entry.villa_name },
-            { label: 'Type', value: entry.booking_type },
-            { label: 'Status', value: getStatusLabel(entry.status) },
-          ].map(f => (
-            <div key={f.label} style={{ background: 'var(--muted)', borderRadius: 8, padding: '10px 12px' }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>{f.label}</div>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>{f.value}</div>
-            </div>
+        {error && <div style={{ background: 'rgba(233,160,167,0.15)', border: '1px solid #E9A0A7', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
+
+        {/* Form fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Your name *</div>
+            <input className="sv-input" style={{ width: '100%' }} value={form.your_name} onChange={f('your_name')} placeholder="Your name" />
+          </div>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Squad</div>
+            <select className="sv-select" style={{ width: '100%' }} value={form.squad} onChange={f('squad')}>
+              <option value="">Select…</option>
+              {['Lonavala','Karjat','Nashik','Alibaug'].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Villa *</div>
+          <VillaSearch value={form.villa_name} onChange={v => setForm(p => ({ ...p, villa_name: v }))} />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking date *</div>
+            <input type="date" className="sv-input" style={{ width: '100%' }} value={form.booking_date} onChange={f('booking_date')} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking type</div>
+            <select className="sv-select" style={{ width: '100%' }} value={form.booking_type} onChange={f('booking_type')}>
+              <option value="">Select…</option>
+              {BOOKING_TYPES.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* 7 category cards */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>
+          Photo categories · {uploadedCount}/{CATEGORIES.length} uploaded
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          {CATEGORIES.map(cat => (
+            <CategoryCard key={cat.key} cat={cat} photo={photos[cat.key]} subtypes={subtypes[cat.key] || []}
+              onPhoto={v => setPhotos(prev => ({ ...prev, [cat.key]: v }))}
+              onSubtype={s => toggleSubtype(cat.key, s)}
+            />
           ))}
         </div>
 
-        {/* Photos */}
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted-fg)' }}>
-          Photo evidence — {photos.length}/{PHOTO_POINTERS.length} uploaded
-        </div>
+        {!isEdit && (
+          <div style={{ background: 'rgba(156,204,252,0.1)', border: '1px solid #9CCCFC', borderRadius: 8, padding: '10px 14px', fontSize: 11, color: '#0C447C', marginBottom: 14 }}>
+            💡 You can submit now with just one photo and add the rest later by editing this entry.
+          </div>
+        )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 24 }}>
-          {PHOTO_POINTERS.map(ptr => {
-            const photo = photos.find(p => p.pointer_key === ptr.key);
-            const url = photo?.public_url 
-              ?? (photo?.storage_path 
-                ? `https://ryuxwnbrdsjwzwdimynd.supabase.co/storage/v1/object/public/delight-photos/${photo.storage_path}`
-                : null);
-            return (
-              <div key={ptr.key} style={{ borderRadius: 10, overflow: 'hidden', border: `1.5px solid ${photo ? '#97C459' : 'rgba(0,0,0,0.08)'}`, background: photo ? '#fff' : 'var(--muted)' }}>
-                {url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer">
-                    <img src={url} alt={ptr.label} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
-                  </a>
-                ) : (
-                  <div style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 28, opacity: 0.3 }}>{ptr.emoji}</span>
-                    <span style={{ fontSize: 10, color: 'var(--muted-fg)' }}>Not uploaded</span>
-                  </div>
-                )}
-                <div style={{ padding: '8px 10px', borderTop: '0.5px solid rgba(0,0,0,0.06)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {photo ? '✅' : '⭕'} {ptr.label}
-                  </div>
-                  {photo && <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 2 }}>
-                    {photo.captured_at ? new Date(photo.captured_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : ''}
-                  </div>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 16, borderTop: '0.5px solid rgba(0,0,0,0.08)' }}>
-          <button className="sv-btn" onClick={onClose}>Close</button>
-          {entry.status !== 'completed' && (
-            <button className="sv-btn sv-btn-primary" onClick={handleApprove}>
-              ✓ Mark as completed
-            </button>
-          )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="sv-btn" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+          <button className="sv-btn sv-btn-primary" onClick={handleSave} disabled={saving} style={{ flex: 2 }}>
+            {saving ? 'Saving…' : isEdit ? '✓ Save changes' : `Submit (${uploadedCount} photo${uploadedCount !== 1 ? 's' : ''})`}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Main page ────────────────────────────────────────────────
+// ── Entry card ────────────────────────────────────────────────
+function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId }: { entry: any; onEdit: () => void; onAcknowledge: () => void; canAcknowledge: boolean; currentUserId: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const acks = entry.acknowledged_by || [];
+  const hasAcked = acks.includes(currentUserId);
+  const ackCount = acks.length;
+  const isCompleted = entry.status === 'completed';
+  const photos = entry.delight_photos || [];
 
-// ── Villa Search for Delight ─────────────────────────────────
-function DelightVillaSearch({ value, onChange, squad }: { value: string; onChange: (v: string) => void; squad: string }) {
-  const [query, setQuery] = useState(value);
-  const [open, setOpen] = useState(false);
-  const results = query.length > 0
-    ? PROPERTIES.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, 10)
-    : PROPERTIES.filter(p => !squad || p.squad === squad).slice(0, 10);
+  const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
+    in_progress: { label: 'In progress', bg: 'rgba(254,213,169,0.2)',  color: '#7A4A08' },
+    completed:   { label: 'Completed',   bg: 'rgba(151,196,89,0.12)', color: '#2D5A0E' },
+    requests:    { label: 'Request',     bg: 'rgba(156,204,252,0.12)', color: '#0C447C' },
+  };
+  const sm = STATUS_META[entry.status] || STATUS_META.in_progress;
+
   return (
-    <div style={{ position: 'relative' }}>
-      <input className="sv-input" style={{ width: '100%' }} placeholder="Search villa name…" value={query}
-        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 180)} />
-      {open && results.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, boxShadow: '0 8px 20px rgba(0,0,0,0.12)', maxHeight: 180, overflowY: 'auto', marginTop: 2 }}>
-          {results.map(p => (
-            <div key={p.id} onMouseDown={() => { setQuery(p.name); onChange(p.name); setOpen(false); }}
-              style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '0.5px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.squad === 'Lonavala' ? '#9CCCFC' : '#97C459', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--muted-fg)' }}>{p.squad} · {p.kms} km</div>
-              </div>
+    <div className="sv-card" style={{ borderLeft: `3px solid ${isCompleted ? '#97C459' : '#9CCCFC'}` }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>🏡 {entry.villa_name || '—'}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sm.bg, color: sm.color }}>{sm.label}</span>
+            {ackCount > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(151,196,89,0.12)', color: '#2D5A0E' }}>✅ {ackCount}/2 ack</span>}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
+            {entry.your_name} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={onEdit}>✏️ Edit</button>
+          <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setExpanded(v => !v)}>
+            {expanded ? '▲' : `📷 ${photos.length}`}
+          </button>
+        </div>
+      </div>
+
+      {/* Photo grid */}
+      {expanded && (
+        <div style={{ marginTop: 14, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+            {CATEGORIES.map(cat => {
+              const p = photos.find((ph: any) => ph.pointer_key === cat.key);
+              return (
+                <div key={cat.key} style={{ borderRadius: 10, overflow: 'hidden', border: `1px solid ${p ? '#97C459' : 'rgba(0,0,0,0.08)'}`, background: p ? '#fff' : 'var(--muted)' }}>
+                  {p ? (
+                    <img src={p.public_url} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
+                  ) : (
+                    <div style={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{cat.emoji}</div>
+                  )}
+                  <div style={{ padding: '6px 8px' }}>
+                    <div style={{ fontSize: 10, fontWeight: 600 }}>{cat.emoji} {cat.label}</div>
+                    {p?.subtypes?.length > 0 && <div style={{ fontSize: 9, color: 'var(--muted-fg)', marginTop: 1 }}>{p.subtypes.join(', ')}</div>}
+                    {!p && <div style={{ fontSize: 9, color: 'var(--muted-fg)' }}>Not uploaded</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Acknowledge button */}
+          {canAcknowledge && !isCompleted && (
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+              {!hasAcked ? (
+                <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={onAcknowledge}>
+                  ✅ Acknowledge ({ackCount}/2 done)
+                </button>
+              ) : (
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#2D5A0E' }}>✅ You acknowledged this</span>
+              )}
+              <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>2 acknowledgements = Completed</span>
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────
 export default function DelightPage() {
-  const [entries, setEntries] = useState<GuestDelight[]>([]);
+  const { user } = useAuth();
+  const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [reviewEntry, setReviewEntry] = useState<GuestDelight | null>(null);
-  const [filterType, setFilterType] = useState('All');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [user, setUser] = useState<AppUser | null>(null);
-  const [backing, setBacking] = useState(false);
-  const [backupMsg, setBackupMsg] = useState('');
+  const [editEntry, setEditEntry] = useState<any | null>(null);
+  const [tab, setTab] = useState<'all' | 'in_progress' | 'completed' | 'requests'>('all');
+  const isSuper = user ? isSupervisor(user.role as any) : false;
 
-  async function backupToDrive() {
-    setBacking(true); setBackupMsg('');
-    try {
-      const res = await fetch('/api/drive-backup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'delight', accessToken: 'via-mcp' }),
-      });
-      const data = await res.json();
-      setBackupMsg(data.message || 'Backup done');
-    } catch { setBackupMsg('Backup failed'); }
-    setBacking(false);
-  }
+  const localUser = (() => { try { return JSON.parse(localStorage.getItem('sv_local_session') || '{}'); } catch { return {}; } })();
 
   async function load() {
     setLoading(true);
-    const data = await fetchGuestDelights();
-    if (user && user.role === 'butler') {
-      setEntries(data.filter(e => e.your_name === user.name));
-    } else {
-      setEntries(data);
-    }
+    const sb = getServiceSupabase();
+    let q = sb.from('guest_delights').select('*, delight_photos(*)').order('created_at', { ascending: false });
+    if (!isSuper) q = q.eq('your_name', localUser.name || '');
+    const { data } = await q;
+    setEntries(data || []);
     setLoading(false);
   }
 
-  useEffect(() => {
-    let currentUser = null;
-    try {
-      const stored = localStorage.getItem('sv_local_session');
-      if (stored) { currentUser = JSON.parse(stored); setUser(currentUser); }
-    } catch {}
-    // Pass user directly to load so filter works on first render
-    const fetchData = async () => {
-      const data = await (await import('@/lib/supabase')).fetchGuestDelights();
-      if (currentUser && currentUser.role === 'butler') {
-        setEntries(data.filter((e: any) => e.your_name === currentUser.name));
-      } else {
-        setEntries(data);
-      }
-      setLoading(false);
-    };
-    fetchData();
-  }, []);
+  useEffect(() => { load(); }, [user?.id]);
 
-  // Realtime polling every 30s (replaces broken Supabase realtime subscription)
-  useEffect(() => {
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  async function handleAcknowledge(entryId: string) {
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) return;
+    const userId = localUser.id;
+    const acks: string[] = entry.acknowledged_by || [];
+    if (acks.includes(userId)) return;
+    const newAcks = [...acks, userId];
+    const newStatus = newAcks.length >= 2 ? 'completed' : 'in_progress';
+    await getServiceSupabase().from('guest_delights').update({ acknowledged_by: newAcks, status: newStatus }).eq('id', entryId);
+    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, acknowledged_by: newAcks, status: newStatus } : e));
+  }
 
-  const isAdminOrSupervisor = user && isSupervisor(user.role);
-  const filtered = entries.filter(e =>
-    (filterType === 'All' || e.booking_type === filterType) &&
-    (filterStatus === 'All' || e.status === filterStatus)
-  );
-  const done = entries.filter(e => e.status === 'completed').length;
-  const pending = entries.filter(e => e.status === 'pending').length;
-  const pct = entries.length > 0 ? Math.round(done / entries.length * 100) : 0;
+  const filtered = entries.filter(e => {
+    if (tab === 'all') return true;
+    if (tab === 'requests') return e.status === 'in_progress' && (!e.acknowledged_by || e.acknowledged_by.length === 0);
+    return e.status === tab;
+  });
+
+  const counts = {
+    all: entries.length,
+    in_progress: entries.filter(e => e.status === 'in_progress').length,
+    completed: entries.filter(e => e.status === 'completed').length,
+    requests: entries.filter(e => e.status === 'in_progress' && (!e.acknowledged_by || e.acknowledged_by.length === 0)).length,
+  };
 
   return (
     <>
-      {showModal && <AddDelightModal user={user} onClose={() => setShowModal(false)} onSaved={load} />}
-      {reviewEntry && <PhotoReviewModal entry={reviewEntry} onClose={() => setReviewEntry(null)} onApprove={load} />}
+      {(showModal || editEntry) && (
+        <LogModal
+          editEntry={editEntry || undefined}
+          onClose={() => { setShowModal(false); setEditEntry(null); }}
+          onSaved={() => { setShowModal(false); setEditEntry(null); load(); }}
+          defaultUser={localUser}
+        />
+      )}
 
-      <Topbar title="Guest delight" subtitle="Photo evidence per booking"
+      <Topbar title="Guest delight" subtitle="Log and track villa activities"
         actions={
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {isAdminOrSupervisor && (
+            {isSuper && (
               <a href="https://drive.google.com/drive/folders/1ExnORyWbMXz9rGKA7vX7tECCVRizqMp_" target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
-                <button className="sv-btn" style={{ fontSize: 12 }}>📁 Drive backup</button>
+                <button className="sv-btn" style={{ fontSize: 12 }}>📁 Drive</button>
               </a>
             )}
             <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowModal(true)}>+ Log activity</button>
@@ -379,139 +415,59 @@ export default function DelightPage() {
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
-          {[{ label: 'Total', value: entries.length, cls: 'blue' }, { label: 'Completed', value: done, cls: 'green' }, { label: 'Pending', value: pending, cls: 'coral' }, { label: 'Completion', value: `${pct}%`, cls: 'peach' }].map(m => (
-            <div key={m.label} className={`metric-card ${m.cls}`}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{m.label}</div>
-              <div style={{ fontSize: 32, fontWeight: 700 }}>{loading ? '…' : m.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Photo pointers guide */}
-        <div className="sv-card" style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Photo pointers — required per booking</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
-            {PHOTO_POINTERS.map(p => (
-              <div key={p.key} style={{ background: 'var(--muted)', borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
-                <div style={{ fontSize: 22, marginBottom: 4 }}>{p.emoji}</div>
-                <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>{p.label}</div>
-                {p.note && <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 3 }}>{p.note}</div>}
+        {/* Summary cards */}
+        {isSuper && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 20 }}>
+            {[
+              { label: 'Total', val: counts.all, cls: 'blue' },
+              { label: 'In progress', val: counts.in_progress, cls: 'peach' },
+              { label: 'Completed', val: counts.completed, cls: 'green' },
+              { label: 'Requests', val: counts.requests, cls: 'coral' },
+            ].map(m => (
+              <div key={m.label} className={`metric-card ${m.cls}`}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{m.label}</div>
+                <div style={{ fontSize: 28, fontWeight: 700 }}>{loading ? '…' : m.val}</div>
               </div>
             ))}
           </div>
+        )}
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+          {([
+            { key: 'all',         label: `All (${counts.all})` },
+            { key: 'requests',    label: `🔔 Requests (${counts.requests})` },
+            { key: 'in_progress', label: `⏳ In progress (${counts.in_progress})` },
+            { key: 'completed',   label: `✅ Completed (${counts.completed})` },
+          ] as const).map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, border: `1.5px solid ${tab === t.key ? '#1B1D1F' : 'rgba(0,0,0,0.1)'}`, background: tab === t.key ? '#1B1D1F' : '#fff', color: tab === t.key ? '#fff' : 'var(--sv-dark)', cursor: 'pointer', fontWeight: tab === t.key ? 600 : 400 }}>
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {/* Activity log */}
-        <div className="sv-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>
-              Activity log <span className="badge badge-green" style={{ marginLeft: 6 }}>Live</span>
-              {isAdminOrSupervisor && <span style={{ fontSize: 12, color: 'var(--muted-fg)', marginLeft: 8, fontWeight: 400 }}>Click any row to review photos</span>}
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <select className="sv-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
-                <option value="All">All types</option>
-                {BOOKING_TYPES.map(t => <option key={t}>{t}</option>)}
-              </select>
-              <select className="sv-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                <option value="All">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="completed">Completed</option>
-                <option value="overdue">Overdue</option>
-              </select>
-              <button className="sv-btn" style={{ fontSize: 12 }} onClick={load}>↻ Refresh</button>
-            </div>
+        {/* Entry list */}
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted-fg)' }}>Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>🎁</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sv-dark)', marginBottom: 4 }}>No entries here</div>
+            <div style={{ fontSize: 12, color: 'var(--muted-fg)' }}>Tap + Log activity to add a new delight entry.</div>
           </div>
-
-          {loading ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted-fg)' }}>Loading…</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted-fg)' }}>
-              No entries yet. Click <strong>+ Log activity</strong> to add the first one.
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="sv-table">
-                <thead>
-                  <tr>
-                    <th>Butler</th><th>Squad</th><th>Date</th><th>Booking ID</th>
-                    <th>Villa</th><th>Type</th><th>Photos</th><th>Status</th>
-                    {isAdminOrSupervisor && <th>Review</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(e => {
-                    const photoCount = e.delight_photos?.length ?? 0;
-                    const allUploaded = photoCount === PHOTO_POINTERS.length;
-                    return (
-                      <tr key={e.id} style={{ cursor: isAdminOrSupervisor ? 'pointer' : 'default' }}
-                        onClick={() => isAdminOrSupervisor && setReviewEntry(e)}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div className="sv-avatar">{e.your_name.slice(0, 2).toUpperCase()}</div>
-                            <span style={{ fontWeight: 500 }}>{e.your_name}</span>
-                          </div>
-                        </td>
-                        <td style={{ color: 'var(--muted-fg)' }}>{e.squad ?? '—'}</td>
-                        <td style={{ color: 'var(--muted-fg)' }}>
-                          {e.booking_date ? new Date(e.booking_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—'}
-                        </td>
-                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{e.booking_id ?? '—'}</td>
-                        <td style={{ fontWeight: 500 }}>{e.villa_name}</td>
-                        <td><span className="badge badge-blue">{e.booking_type}</span></td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: allUploaded ? '#2D5A0E' : photoCount > 0 ? '#7A4A08' : 'var(--muted-fg)' }}>
-                              📷 {photoCount}/{PHOTO_POINTERS.length}
-                            </span>
-                            {allUploaded && <span className="badge badge-green">Complete</span>}
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span className={getStatusBadge(e.status)}>{getStatusLabel(e.status)}</span>
-                            {photoCount > 0 && (
-                              <button className="sv-btn" style={{ fontSize: 10, padding: '3px 8px' }}
-                                onClick={ev => { ev.stopPropagation(); setReviewEntry(e); }}>
-                                🖼 View
-                              </button>
-                            )}
-                            {photoCount > 0 && (
-                              <button className="sv-btn" style={{ fontSize: 10, padding: '3px 8px' }}
-                                onClick={ev => {
-                                  ev.stopPropagation();
-                                  const photos = e.delight_photos ?? [];
-                                  photos.forEach((p, i) => {
-                                    if (p.public_url) {
-                                      const a = document.createElement('a');
-                                      a.href = p.public_url;
-                                      a.download = `${e.your_name}_${e.villa_name}_${p.pointer_key}.jpg`;
-                                      a.target = '_blank';
-                                      a.click();
-                                    }
-                                  });
-                                }}>
-                                ⬇ Photos
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        {isAdminOrSupervisor && (
-                          <td onClick={ev => { ev.stopPropagation(); setReviewEntry(e); }}>
-                            <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }}>
-                              {photoCount > 0 ? '🔍 Review' : '📋 View'}
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {filtered.map(entry => (
+              <EntryCard key={entry.id} entry={entry}
+                onEdit={() => setEditEntry(entry)}
+                onAcknowledge={() => handleAcknowledge(entry.id)}
+                canAcknowledge={isSuper}
+                currentUserId={localUser.id || ''}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </>
   );
