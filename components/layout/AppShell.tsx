@@ -28,6 +28,7 @@ const navByRole: Record<string, NavSection> = {
     admin: [
       { label: 'Credentials', href: '/credentials', icon: '🔐' },
       { label: 'MIS & Reports', href: '/reports', icon: '📈' },
+      { label: 'Help & Guide', href: '/guide', icon: '📖' },
       { label: 'Management', href: '/management', icon: '⚙' },
     ],
   },
@@ -61,6 +62,7 @@ const navByRole: Record<string, NavSection> = {
     ],
     learning: [
       { label: 'My trainings', href: '/training', icon: '📚' },
+      { label: 'Help & Guide', href: '/guide', icon: '📖' },
       { label: 'Huddles', href: '/huddle', icon: '💬' },
     ],
     admin: [],
