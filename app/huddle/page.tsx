@@ -158,7 +158,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button type="button" className="sv-btn" onClick={onClose}>Cancel</button>
                   {addQuiz ? (
-                    <button type="button" className="sv-btn sv-btn-primary" onClick={() => { if (!form.team || !form.huddle_date) { setError('Fill in team name and date first'); return; } setError(''); setStep('quiz'); }}>
+                    <button type="button" className="sv-btn sv-btn-primary" onClick={() => { if (!form.team) { setError('Please fill in the team / huddle name.'); return; } if (!form.huddle_date) { setError('Please select a date for the huddle.'); return; } setError(''); setStep('quiz'); }}>
                       Next: Add quiz →
                     </button>
                   ) : (
