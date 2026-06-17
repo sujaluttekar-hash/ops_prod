@@ -628,11 +628,6 @@ export default function HuddlePage() {
 
                           <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <span className={getStatusBadge(h.status)}>{getStatusLabel(h.status)}</span>
-                            <a href={`/call/${h.id}`} style={{ textDecoration: 'none' }}>
-                              <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px', background: '#141618', color: '#9CCCFC', borderColor: 'rgba(156,204,252,0.25)', fontWeight: 600 }}>
-                                📹 Join call
-                              </button>
-                            </a>
                             {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => setAttendanceHuddle(h)}>Mark attendance</button>}
                             {isSuper && h.hasQuiz && (
                               <button className="sv-btn" style={{ fontSize: 11, padding: '3px 10px', background: 'rgba(156,204,252,0.15)', borderColor: '#9CCCFC', color: '#0C447C', fontWeight: 600 }} onClick={() => setScoresHuddle(h)}>
