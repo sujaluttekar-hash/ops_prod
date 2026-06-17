@@ -140,6 +140,7 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
   const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const voice = useVoiceRecorder();
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -153,62 +154,67 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
 
   async function handleSubmit() {
     setSaving(true);
+    setSubmitError('');
     try {
-      // Get GPS location at time of task completion
-      const pos = await getCurrentPosition();
-
+      // Upload photo first (if any)
       let photo_url: string | null = null;
       if (photo) {
         photo_url = await uploadTaskPhoto(photo.file, task.id);
       }
 
+      // Save task as completed — GPS runs after, non-blocking
       const { error } = await getServiceSupabase().from('tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         notes: [isCustom && customTaskName ? `Task: ${customTaskName}` : '', notes || task.notes || ''].filter(Boolean).join(' · ') || null,
         photo_path: photo_url || task.photo_path || null,
-        geo_lat: pos?.lat || null,
-        geo_lng: pos?.lng || null,
       }).eq('id', task.id);
 
       if (error) {
-        alert('Failed to save: ' + error.message);
+        setSubmitError('Failed to save: ' + error.message);
         setSaving(false);
         return;
       }
 
-      // Update butler's live location on the map
-      if (pos) {
+      // Mark done immediately — don't wait for GPS or voice
+      setDone(true);
+      onDone(task.id);
+      setTimeout(() => { onClose(); }, 1200);
+
+      // GPS + location update runs in background after modal closes
+      getCurrentPosition().then(pos => {
+        if (!pos) return;
+        // Update geo on task
+        getServiceSupabase().from('tasks').update({ geo_lat: pos.lat, geo_lng: pos.lng }).eq('id', task.id).catch(() => {});
+        // Update butler live location
         try {
           const stored = localStorage.getItem('sv_local_session');
           if (stored) {
             const u = JSON.parse(stored);
-            await fetch('/api/location', {
+            fetch('/api/location', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ butler_id: u.id, butler_name: u.name, squad: u.squad || null, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy }),
-            });
+            }).catch(() => {});
           }
         } catch {}
-      }
+      }).catch(() => {});
 
-      // Upload voice note if recorded
+      // Voice note upload in background
       if (voice.audioBlob) {
-        try {
-          const vPath = `tasks/voice_${task.id}_${Date.now()}.webm`;
-          const { data: vData } = await getServiceSupabase().storage.from('delight-photos').upload(vPath, voice.audioBlob, { upsert: true, contentType: 'audio/webm' });
-          if (vData) {
-            const { data: { publicUrl } } = getServiceSupabase().storage.from('delight-photos').getPublicUrl(vData.path);
-            await getServiceSupabase().from('tasks').update({ voice_url: publicUrl }).eq('id', task.id);
-          }
-        } catch {}
+        const vPath = `tasks/voice_${task.id}_${Date.now()}.webm`;
+        getServiceSupabase().storage.from('delight-photos')
+          .upload(vPath, voice.audioBlob, { upsert: true, contentType: 'audio/webm' })
+          .then(({ data: vData }: { data: any }) => {
+            if (vData) {
+              const { data: { publicUrl } } = getServiceSupabase().storage.from('delight-photos').getPublicUrl(vData.path);
+              getServiceSupabase().from('tasks').update({ voice_url: publicUrl }).eq('id', task.id).catch(() => {});
+            }
+          }).catch(() => {});
       }
 
-      setDone(true);
-      onDone(task.id);
-      setTimeout(() => { onClose(); }, 1200);
     } catch (e: any) {
-      alert('Error: ' + e.message);
+      setSubmitError('Error: ' + (e?.message || 'Please try again'));
       setSaving(false);
     }
   }
@@ -237,6 +243,7 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
               </div>
               <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
             </div>
+            {submitError && <div style={{ background: 'rgba(233,160,167,0.15)', border: '1px solid #E9A0A7', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#8B2020', marginBottom: 14 }}>⚠ {submitError}</div>}
             <div className="sv-strip" style={{ marginBottom: 18 }} />
             {/* Custom task name input */}
             {isCustom && (
