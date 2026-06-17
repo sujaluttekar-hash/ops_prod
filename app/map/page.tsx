@@ -288,15 +288,21 @@ export default function MapPage() {
         .sv-map-tooltip::before { border-top-color: #1B1D1F !important; }
         .leaflet-control-attribution { display: none; }
         @media (max-width: 768px) {
-          .map-layout { flex-direction: column !important; }
-          .map-sidebar { width: 100% !important; height: 260px !important; border-right: none !important; border-bottom: 1px solid rgba(0,0,0,0.08) !important; }
-          .map-container { height: 55vh !important; }
+          .map-layout { flex-direction: column !important; height: auto !important; min-height: unset !important; }
+          .map-sidebar { width: 100% !important; height: 200px !important; border-right: none !important; border-bottom: 1px solid rgba(0,0,0,0.08) !important; overflow-y: auto !important; }
+          .map-container { height: 52vh !important; min-height: 300px !important; }
+          .map-legend { display: none !important; }
         }
       `}</style>
 
       <Topbar
         title="Property Map"
-        subtitle={`${filtered.length} of ${PROPERTIES.length} villas · ${taskPins.filter(t => t.status === 'pending').length} tasks · ${butlerLocations.length} butlers live`}
+        subtitle={(() => {
+          const stored = typeof window !== 'undefined' ? localStorage.getItem('sv_local_session') : null;
+          const lu = stored ? JSON.parse(stored) : null;
+          const base = `${filtered.length} of ${PROPERTIES.length} villas · ${taskPins.filter(t => t.status === 'pending').length} tasks`;
+          return lu?.role === 'butler' ? base : base + ` · ${butlerLocations.length} butlers live`;
+        })()}
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
 
@@ -370,7 +376,7 @@ export default function MapPage() {
               )}
 
               {/* Map legend — interactive checkboxes */}
-              <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'rgba(255,255,255,0.97)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 2px 16px rgba(0,0,0,0.14)', fontSize: 12, minWidth: 170 }}>
+              <div className="map-legend" style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, background: 'rgba(255,255,255,0.97)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 2px 16px rgba(0,0,0,0.14)', fontSize: 12, minWidth: 170 }}>
                 <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--muted-fg)' }}>Layers</div>
                 {[
                   { dot: '#9CCCFC', label: 'Lonavala villas', checked: showLonavala, toggle: () => setShowLonavala(v => !v) },

@@ -144,7 +144,7 @@ function ReportModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 
       // Notify admin (non-blocking)
       sb.from('profiles').select('id').in('role', ['super_admin', 'ops_manager'])
-        .then(({ data: admins }) => {
+        .then(({ data: admins }: { data: any[] | null }) => {
           if (admins?.length) {
             sb.from('notifications').insert(admins.map((a: any) => ({
               user_id: a.id, title: `🆘 Incident at ${villaValue}`,
