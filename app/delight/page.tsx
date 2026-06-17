@@ -159,12 +159,24 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         if (upData) {
           const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(upData.path);
           // Save to delight_photos table with subtype metadata
-          await sb.from('delight_photos').upsert({
+          // Try with new columns first, fallback to basic columns
+          const photoRow: any = {
             delight_id: entryId, pointer_key: cat.key,
             storage_path: path, public_url: publicUrl,
-            subtypes: subtypes[cat.key] || [],
-            uploaded_at: new Date().toISOString(),
-          }, { onConflict: 'delight_id,pointer_key' });
+          };
+          // Add new columns only if they exist (graceful degradation)
+          try {
+            const { error: upErr } = await sb.from('delight_photos').upsert(
+              { ...photoRow, subtypes: subtypes[cat.key] || [], uploaded_at: new Date().toISOString() },
+              { onConflict: 'delight_id,pointer_key' }
+            );
+            if (upErr) {
+              // Fallback: insert without new columns
+              await sb.from('delight_photos').upsert(photoRow, { onConflict: 'delight_id,pointer_key' });
+            }
+          } catch {
+            await sb.from('delight_photos').upsert(photoRow, { onConflict: 'delight_id,pointer_key' });
+          }
         }
       }
 
@@ -322,7 +334,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId
                   )}
                   <div style={{ padding: '6px 8px' }}>
                     <div style={{ fontSize: 10, fontWeight: 600 }}>{cat.emoji} {cat.label}</div>
-                    {p?.subtypes?.length > 0 && <div style={{ fontSize: 9, color: 'var(--muted-fg)', marginTop: 1 }}>{p.subtypes.join(', ')}</div>}
+                    {p?.subtypes?.length > 0 && <div style={{ fontSize: 9, color: 'var(--muted-fg)', marginTop: 1 }}>{Array.isArray(p.subtypes) ? p.subtypes.join(', ') : ''}</div>}
                     {!p && <div style={{ fontSize: 9, color: 'var(--muted-fg)' }}>Not uploaded</div>}
                   </div>
                 </div>
@@ -355,7 +367,8 @@ export default function DelightPage() {
     setLoading(true);
     const sb = getServiceSupabase();
     try {
-      let q = sb.from('guest_delights').select('*, delight_photos(id,pointer_key,public_url,storage_path,subtypes,uploaded_at)').order('created_at', { ascending: false });
+      // Select only guaranteed columns from delight_photos
+      let q = sb.from('guest_delights').select('*, delight_photos(id,pointer_key,public_url,storage_path)').order('created_at', { ascending: false });
       if (!isSuper) q = q.eq('your_name', localUser.name || '');
       const { data, error } = await q;
       if (error) {
