@@ -359,20 +359,29 @@ export default function DelightPage() {
     setLoading(true);
     const sb = getServiceSupabase();
     try {
-      // Select only guaranteed columns from delight_photos
-      let q = sb.from('guest_delights').select('*, delight_photos(id,pointer_key,public_url,storage_path)').order('created_at', { ascending: false });
-      if (!isSuper) q = q.eq('your_name', localUser.name || '');
-      const { data, error } = await q;
-      if (error) {
-        // delight_photos columns may not exist yet — fallback without join
-        let q2 = sb.from('guest_delights').select('*').order('created_at', { ascending: false });
-        if (!isSuper) q2 = q2.eq('your_name', localUser.name || '');
-        const { data: data2 } = await q2;
-        setEntries((data2 || []).map((e: any) => ({ ...e, delight_photos: [] })));
-      } else {
-        setEntries(data || []);
-      }
-    } catch {
+      // Fetch delights and photos separately — join doesn't work without FK constraint
+      let delightQ = sb.from('guest_delights').select('*').order('created_at', { ascending: false });
+      if (!isSuper) delightQ = delightQ.eq('your_name', localUser.name || '');
+      const { data: delights } = await delightQ;
+
+      const { data: allPhotos } = await sb.from('delight_photos')
+        .select('id, delight_id, pointer_key, public_url, storage_path');
+
+      // Merge photos into their delight entries
+      const photosMap: Record<string, any[]> = {};
+      (allPhotos || []).forEach((p: any) => {
+        if (!photosMap[p.delight_id]) photosMap[p.delight_id] = [];
+        photosMap[p.delight_id].push(p);
+      });
+
+      const merged = (delights || []).map((d: any) => ({
+        ...d,
+        delight_photos: photosMap[d.id] || [],
+      }));
+
+      setEntries(merged);
+    } catch (e) {
+      console.error('load error:', e);
       setEntries([]);
     }
     setLoading(false);
