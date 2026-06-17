@@ -290,7 +290,16 @@ function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId
             {entry.your_name} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {canAcknowledge && !isCompleted && (
+            !hasAcked ? (
+              <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '5px 12px', background: '#0C447C', borderColor: '#0C447C' }} onClick={onAcknowledge}>
+                ✅ Acknowledge {ackCount > 0 ? `(${ackCount}/2)` : ''}
+              </button>
+            ) : (
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#2D5A0E', padding: '5px 10px', background: 'rgba(151,196,89,0.12)', borderRadius: 8 }}>✅ Acknowledged</span>
+            )
+          )}
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={onEdit}>✏️ Edit</button>
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setExpanded(v => !v)}>
             {expanded ? '▲' : `📷 ${photos.length}`}
@@ -321,19 +330,9 @@ function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId
             })}
           </div>
 
-          {/* Acknowledge button */}
-          {canAcknowledge && !isCompleted && (
-            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
-              {!hasAcked ? (
-                <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={onAcknowledge}>
-                  ✅ Acknowledge ({ackCount}/2 done)
-                </button>
-              ) : (
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#2D5A0E' }}>✅ You acknowledged this</span>
-              )}
-              <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>2 acknowledgements = Completed</span>
-            </div>
-          )}
+          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted-fg)' }}>
+            {ackCount === 0 ? 'No acknowledgements yet · needs 2 to complete' : ackCount === 1 ? '1/2 acknowledged · needs 1 more' : '✅ Fully acknowledged'}
+          </div>
         </div>
       )}
     </div>
@@ -355,10 +354,22 @@ export default function DelightPage() {
   async function load() {
     setLoading(true);
     const sb = getServiceSupabase();
-    let q = sb.from('guest_delights').select('*, delight_photos(*)').order('created_at', { ascending: false });
-    if (!isSuper) q = q.eq('your_name', localUser.name || '');
-    const { data } = await q;
-    setEntries(data || []);
+    try {
+      let q = sb.from('guest_delights').select('*, delight_photos(id,pointer_key,public_url,storage_path,subtypes,uploaded_at)').order('created_at', { ascending: false });
+      if (!isSuper) q = q.eq('your_name', localUser.name || '');
+      const { data, error } = await q;
+      if (error) {
+        // delight_photos columns may not exist yet — fallback without join
+        let q2 = sb.from('guest_delights').select('*').order('created_at', { ascending: false });
+        if (!isSuper) q2 = q2.eq('your_name', localUser.name || '');
+        const { data: data2 } = await q2;
+        setEntries((data2 || []).map((e: any) => ({ ...e, delight_photos: [] })));
+      } else {
+        setEntries(data || []);
+      }
+    } catch {
+      setEntries([]);
+    }
     setLoading(false);
   }
 
@@ -437,11 +448,11 @@ export default function DelightPage() {
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
           {([
-            { key: 'all',         label: `All (${counts.all})` },
-            { key: 'requests',    label: `🔔 Requests (${counts.requests})` },
-            { key: 'in_progress', label: `⏳ In progress (${counts.in_progress})` },
-            { key: 'completed',   label: `✅ Completed (${counts.completed})` },
-          ] as const).map(t => (
+            { key: 'all',         label: `All (${counts.all})`, show: true },
+            { key: 'requests',    label: `🔔 Requests (${counts.requests})`, show: isSuper },
+            { key: 'in_progress', label: `⏳ In progress (${counts.in_progress})`, show: true },
+            { key: 'completed',   label: `✅ Completed (${counts.completed})`, show: true },
+          ] as const).filter(t => t.show).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, border: `1.5px solid ${tab === t.key ? '#1B1D1F' : 'rgba(0,0,0,0.1)'}`, background: tab === t.key ? '#1B1D1F' : '#fff', color: tab === t.key ? '#fff' : 'var(--sv-dark)', cursor: 'pointer', fontWeight: tab === t.key ? 600 : 400 }}>
               {t.label}
