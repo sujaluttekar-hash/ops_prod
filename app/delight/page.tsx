@@ -144,7 +144,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         const { data, error: insertErr } = await sb.from('guest_delights').insert({
           your_name: form.your_name, squad: form.squad, booking_date: form.booking_date,
           booking_id: form.booking_id || null, villa_name: form.villa_name,
-          booking_type: form.booking_type, status: 'in_progress',
+          booking_type: form.booking_type, status: 'pending',
         }).select().single();
         if (insertErr) throw new Error(insertErr.message);
         entryId = data.id;
@@ -270,6 +270,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, canAcknowledge, currentUserId
 
   const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
     in_progress: { label: 'In progress', bg: 'rgba(254,213,169,0.2)',  color: '#7A4A08' },
+    pending:     { label: 'In progress', bg: 'rgba(254,213,169,0.2)',  color: '#7A4A08' },
     completed:   { label: 'Completed',   bg: 'rgba(151,196,89,0.12)', color: '#2D5A0E' },
     requests:    { label: 'Request',     bg: 'rgba(156,204,252,0.12)', color: '#0C447C' },
   };
@@ -370,22 +371,23 @@ export default function DelightPage() {
     const acks: string[] = entry.acknowledged_by || [];
     if (acks.includes(userId)) return;
     const newAcks = [...acks, userId];
-    const newStatus = newAcks.length >= 2 ? 'completed' : 'in_progress';
+    const newStatus = newAcks.length >= 2 ? 'completed' : 'pending';
     await getServiceSupabase().from('guest_delights').update({ acknowledged_by: newAcks, status: newStatus }).eq('id', entryId);
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, acknowledged_by: newAcks, status: newStatus } : e));
   }
 
   const filtered = entries.filter(e => {
     if (tab === 'all') return true;
-    if (tab === 'requests') return e.status === 'in_progress' && (!e.acknowledged_by || e.acknowledged_by.length === 0);
+    if (tab === 'requests') return (e.status === 'pending' || e.status === 'in_progress') && (!e.acknowledged_by || e.acknowledged_by.length === 0);
+    if (tab === 'in_progress') return e.status === 'pending' || e.status === 'in_progress';
     return e.status === tab;
   });
 
   const counts = {
     all: entries.length,
-    in_progress: entries.filter(e => e.status === 'in_progress').length,
+    in_progress: entries.filter(e => e.status === 'pending' || e.status === 'in_progress').length,
     completed: entries.filter(e => e.status === 'completed').length,
-    requests: entries.filter(e => e.status === 'in_progress' && (!e.acknowledged_by || e.acknowledged_by.length === 0)).length,
+    requests: entries.filter(e => (e.status === 'pending' || e.status === 'in_progress') && (!e.acknowledged_by || e.acknowledged_by.length === 0)).length,
   };
 
   return (
