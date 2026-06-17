@@ -58,7 +58,7 @@ function ScheduleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
             <div style={{ fontSize: 16, fontWeight: 700 }}>Training scheduled!</div>
           </div>
         ) : (
-          <form onSubmit={handleSave}>
+          <form onSubmit={handleSave} onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') e.preventDefault(); }}>
             {error && <div style={{ background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.3)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
             <div style={{ display: 'grid', gap: 12 }}>
               <div>
@@ -135,14 +135,19 @@ function AttendanceModal({ training, profiles, onClose, onSaved }: { training: T
   async function handleSave() {
     setSaving(true);
     const sb = getServiceSupabase();
-    for (const p of butlers) {
-      await sb.from('training_attendance').upsert(
-        { training_id: training.id, butler_id: p.id, attended: attended.has(p.id) },
-        { onConflict: 'training_id,butler_id' }
-      );
-    }
-    if (attended.size > 0) {
-      await sb.from('trainings').update({ status: 'completed' }).eq('id', training.id);
+    try {
+      // Delete existing attendance for this training then insert fresh
+      await sb.from('training_attendance').delete().eq('training_id', training.id);
+      if (butlers.length > 0) {
+        await sb.from('training_attendance').insert(
+          butlers.map(p => ({ training_id: training.id, butler_id: p.id, attended: attended.has(p.id) }))
+        );
+      }
+      if (attended.size > 0) {
+        await sb.from('trainings').update({ status: 'completed' }).eq('id', training.id);
+      }
+    } catch (e: any) {
+      console.error('Attendance save error:', e);
     }
     setSaved(true);
     setTimeout(() => { onSaved(); onClose(); }, 700);
@@ -361,28 +366,7 @@ export default function TrainingPage() {
           )}
         </div>
 
-        {/* Butler roster — admin/supervisor only */}
-        {isSuper && <div className="sv-card">
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Butler roster</div>
-          <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginBottom: 14 }}>All active butlers in the system</div>
-          {loading ? (
-            <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>Loading…</div>
-          ) : profiles.length === 0 ? (
-            <div style={{ color: 'var(--muted-fg)', fontSize: 13 }}>No butlers in the system yet.</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-              {profiles.map(p => (
-                <div key={p.id} style={{ background: 'var(--muted)', borderRadius: 10, padding: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className="sv-avatar">{(p.name || "??").slice(0,2).toUpperCase()}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted-fg)' }}>{p.squad ?? '—'} · {p.role}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>}
+
       </div>
     </>
   );
