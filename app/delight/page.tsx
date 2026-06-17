@@ -46,10 +46,12 @@ function VillaSearch({ value, onChange }: { value: string; onChange: (v: string)
 }
 
 // ── Category card in modal ────────────────────────────────────
-function CategoryCard({ cat, photo, subtypes, onPhoto, onSubtype }: { cat: typeof CATEGORIES[0]; photo: PhotoVal; subtypes: string[]; onPhoto: (v: PhotoVal) => void; onSubtype: (s: string) => void }) {
+function CategoryCard({ cat, photo, existingPhoto, subtypes, onPhoto, onSubtype }: { cat: typeof CATEGORIES[0]; photo: PhotoVal; existingPhoto?: any; subtypes: string[]; onPhoto: (v: PhotoVal) => void; onSubtype: (s: string) => void }) {
   const camRef = useRef<HTMLInputElement>(null);
   const galRef = useRef<HTMLInputElement>(null);
-  const hasPhoto = !!photo;
+  const hasNewPhoto = !!photo;
+  const hasExistingPhoto = !!existingPhoto?.public_url && !photo; // show existing only if no new photo selected
+  const hasPhoto = hasNewPhoto || hasExistingPhoto;
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -81,14 +83,22 @@ function CategoryCard({ cat, photo, subtypes, onPhoto, onSubtype }: { cat: typeo
         </div>
       )}
 
-      {/* Photo preview */}
-      {hasPhoto && (
+      {/* Photo preview — show new upload OR existing from DB */}
+      {hasNewPhoto && (
         <div style={{ position: 'relative', marginBottom: 8 }}>
           <img src={photo!.preview} style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 8, border: '1px solid #97C459' }} />
           <button type="button" onClick={() => onPhoto(null)} style={{ position: 'absolute', top: 6, right: 6, background: '#fff', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 12, fontWeight: 700, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}>✕</button>
           <div style={{ position: 'absolute', bottom: 6, left: 8, fontSize: 9, color: '#fff', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: 4 }}>
             {new Date(photo!.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
           </div>
+          <div style={{ position: 'absolute', top: 6, left: 8, fontSize: 9, color: '#fff', background: 'rgba(151,196,89,0.9)', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>New</div>
+        </div>
+      )}
+      {hasExistingPhoto && (
+        <div style={{ position: 'relative', marginBottom: 8 }}>
+          <img src={existingPhoto.public_url} style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 8, border: '1.5px solid #97C459' }} />
+          <div style={{ position: 'absolute', top: 6, left: 8, fontSize: 9, color: '#fff', background: 'rgba(45,90,14,0.85)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>✅ Uploaded</div>
+          <div style={{ position: 'absolute', top: 6, right: 8, fontSize: 9, color: '#fff', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: 4 }}>Tap Camera/Gallery to replace</div>
         </div>
       )}
 
@@ -96,7 +106,7 @@ function CategoryCard({ cat, photo, subtypes, onPhoto, onSubtype }: { cat: typeo
       <input ref={camRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: 'none' }} />
       <input ref={galRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
       <div style={{ display: 'flex', gap: 6 }}>
-        <button type="button" onClick={() => camRef.current?.click()} className="sv-btn" style={{ flex: 1, fontSize: 11, padding: '5px 0' }}>📷 {hasPhoto ? 'Retake' : 'Camera'}</button>
+        <button type="button" onClick={() => camRef.current?.click()} className="sv-btn" style={{ flex: 1, fontSize: 11, padding: '5px 0' }}>📷 {hasExistingPhoto ? 'Replace' : hasNewPhoto ? 'Retake' : 'Camera'}</button>
         <button type="button" onClick={() => galRef.current?.click()} className="sv-btn" style={{ flex: 1, fontSize: 11, padding: '5px 0' }}>🖼 Gallery</button>
       </div>
     </div>
@@ -116,6 +126,10 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
   });
   const [photos, setPhotos] = useState<Record<string, PhotoVal>>(Object.fromEntries(CATEGORIES.map(c => [c.key, null])));
   const [subtypes, setSubtypes] = useState<Record<string, string[]>>(Object.fromEntries(CATEGORIES.map(c => [c.key, []])));
+  // Existing photos from DB (for edit mode) — keyed by pointer_key
+  const existingPhotos: Record<string, any> = Object.fromEntries(
+    (editEntry?.delight_photos || []).map((p: any) => [p.pointer_key, p])
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const f = (k: string) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -127,7 +141,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
     });
   }
 
-  const uploadedCount = Object.values(photos).filter(Boolean).length;
+  const uploadedCount = CATEGORIES.filter(cat => photos[cat.key] || existingPhotos[cat.key]).length;
 
   async function handleSave() {
     if (!form.villa_name) { setError('Please select a villa'); return; }
@@ -239,7 +253,9 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
           {CATEGORIES.map(cat => (
-            <CategoryCard key={cat.key} cat={cat} photo={photos[cat.key]} subtypes={subtypes[cat.key] || []}
+            <CategoryCard key={cat.key} cat={cat} photo={photos[cat.key]}
+              existingPhoto={existingPhotos[cat.key]}
+              subtypes={subtypes[cat.key] || []}
               onPhoto={v => setPhotos(prev => ({ ...prev, [cat.key]: v }))}
               onSubtype={s => toggleSubtype(cat.key, s)}
             />
