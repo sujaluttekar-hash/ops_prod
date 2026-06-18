@@ -415,7 +415,7 @@ export default function DelightPage() {
       const { data: delights } = await delightQ;
 
       const { data: allPhotos } = await sb.from('delight_photos')
-        .select('id, delight_id, pointer_key, public_url, storage_path, photo_status');
+        .select('*');
 
       // Merge photos into their delight entries
       const photosMap: Record<string, any[]> = {};
