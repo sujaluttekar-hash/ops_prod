@@ -233,6 +233,11 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
           <VillaSearch value={form.villa_name} onChange={v => setForm(p => ({ ...p, villa_name: v }))} />
         </div>
 
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking ID</div>
+          <input className="sv-input" style={{ width: '100%' }} placeholder="e.g. BK-2026-1234 (optional)" value={form.booking_id} onChange={f('booking_id')} />
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
           <div>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking date *</div>
@@ -280,13 +285,18 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
 }
 
 // ── Entry card ────────────────────────────────────────────────
-function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, canAcknowledge, currentUserId }: { entry: any; onEdit: () => void; onAcknowledge: () => void; onUnacknowledge: () => void; canAcknowledge: boolean; currentUserId: string }) {
+function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoAction, canAcknowledge, currentUserId }: { entry: any; onEdit: () => void; onAcknowledge: () => void; onUnacknowledge: () => void; onPhotoAction: (photoId: string, action: 'approved' | 'declined') => void; canAcknowledge: boolean; currentUserId: string }) {
   const [expanded, setExpanded] = useState(false);
   const acks = entry.acknowledged_by || [];
   const hasAcked = acks.includes(currentUserId);
   const ackCount = acks.length;
   const isCompleted = entry.status === 'completed';
   const photos = entry.delight_photos || [];
+  // 6-hour edit window
+  const createdAt = entry.created_at ? new Date(entry.created_at).getTime() : 0;
+  const hoursElapsed = (Date.now() - createdAt) / (1000 * 60 * 60);
+  const canEdit = hoursElapsed < 6;
+  const editLockedMsg = canEdit ? '' : `Locked ${Math.floor(hoursElapsed)}h ago`;
 
   const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
     in_progress: { label: 'In progress', bg: 'rgba(254,213,169,0.2)',  color: '#7A4A08' },
@@ -307,7 +317,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, canAcknowled
             {ackCount > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(151,196,89,0.12)', color: '#2D5A0E' }}>✅ Acknowledged</span>}
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
-            {entry.your_name} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+            {entry.your_name} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}{entry.booking_id ? ` · #${entry.booking_id}` : ''}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -322,7 +332,11 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, canAcknowled
               </button>
             )
           )}
-          <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={onEdit}>✏️ Edit</button>
+          {canEdit ? (
+            <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={onEdit}>✏️ Edit</button>
+          ) : (
+            <span style={{ fontSize: 10, color: 'var(--muted-fg)', padding: '4px 8px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.08)' }}>🔒 {editLockedMsg}</span>
+          )}
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setExpanded(v => !v)}>
             {expanded ? '▲' : `📷 ${photos.length}`}
           </button>
@@ -336,7 +350,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, canAcknowled
             {CATEGORIES.map(cat => {
               const p = photos.find((ph: any) => ph.pointer_key === cat.key);
               return (
-                <div key={cat.key} style={{ borderRadius: 10, overflow: 'hidden', border: `1px solid ${p ? '#97C459' : 'rgba(0,0,0,0.08)'}`, background: p ? '#fff' : 'var(--muted)' }}>
+                <div key={cat.key} style={{ borderRadius: 10, overflow: 'hidden', border: `1.5px solid ${p?.photo_status === 'approved' ? '#97C459' : p?.photo_status === 'declined' ? '#E9A0A7' : p ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.08)'}`, background: p ? '#fff' : 'var(--muted)' }}>
                   {p ? (
                     <img src={p.public_url} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
                   ) : (
@@ -346,6 +360,24 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, canAcknowled
                     <div style={{ fontSize: 10, fontWeight: 600 }}>{cat.emoji} {cat.label}</div>
                     {p?.subtypes?.length > 0 && <div style={{ fontSize: 9, color: 'var(--muted-fg)', marginTop: 1 }}>{Array.isArray(p.subtypes) ? p.subtypes.join(', ') : ''}</div>}
                     {!p && <div style={{ fontSize: 9, color: 'var(--muted-fg)' }}>Not uploaded</div>}
+                    {/* Approve / Decline for admin */}
+                    {p && canAcknowledge && (
+                      <div style={{ marginTop: 5 }}>
+                        {p.photo_status === 'approved' ? (
+                          <span style={{ fontSize: 9, fontWeight: 700, color: '#2D5A0E', background: 'rgba(151,196,89,0.12)', padding: '2px 6px', borderRadius: 4 }}>✅ Approved</span>
+                        ) : p.photo_status === 'declined' ? (
+                          <div>
+                            <span style={{ fontSize: 9, fontWeight: 700, color: '#8B2020', background: 'rgba(233,160,167,0.12)', padding: '2px 6px', borderRadius: 4 }}>❌ Declined</span>
+                            <button onClick={() => onPhotoAction(p.id, 'approved')} style={{ marginLeft: 4, fontSize: 8, padding: '1px 5px', borderRadius: 3, border: '1px solid #97C459', background: 'none', color: '#2D5A0E', cursor: 'pointer' }}>Approve</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
+                            <button onClick={() => onPhotoAction(p.id, 'approved')} style={{ flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 4, border: 'none', background: 'rgba(151,196,89,0.15)', color: '#2D5A0E', cursor: 'pointer', fontWeight: 600 }}>✅ Ok</button>
+                            <button onClick={() => onPhotoAction(p.id, 'declined')} style={{ flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 4, border: 'none', background: 'rgba(233,160,167,0.12)', color: '#8B2020', cursor: 'pointer', fontWeight: 600 }}>❌ Redo</button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -383,7 +415,7 @@ export default function DelightPage() {
       const { data: delights } = await delightQ;
 
       const { data: allPhotos } = await sb.from('delight_photos')
-        .select('id, delight_id, pointer_key, public_url, storage_path');
+        .select('id, delight_id, pointer_key, public_url, storage_path, photo_status');
 
       // Merge photos into their delight entries
       const photosMap: Record<string, any[]> = {};
@@ -421,6 +453,17 @@ export default function DelightPage() {
   async function handleUnacknowledge(entryId: string) {
     await getServiceSupabase().from('guest_delights').update({ acknowledged_by: [], status: 'pending' }).eq('id', entryId);
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, acknowledged_by: [], status: 'pending' } : e));
+  }
+
+  async function handlePhotoAction(photoId: string, action: 'approved' | 'declined') {
+    await getServiceSupabase().from('delight_photos').update({ photo_status: action }).eq('id', photoId);
+    // Update local state
+    setEntries(prev => prev.map(e => ({
+      ...e,
+      delight_photos: (e.delight_photos || []).map((p: any) =>
+        p.id === photoId ? { ...p, photo_status: action } : p
+      ),
+    })));
   }
 
   const filtered = entries.filter(e => {
@@ -512,6 +555,7 @@ export default function DelightPage() {
                 onEdit={() => setEditEntry(entry)}
                 onAcknowledge={() => handleAcknowledge(entry.id)}
                 onUnacknowledge={() => handleUnacknowledge(entry.id)}
+                onPhotoAction={handlePhotoAction}
                 canAcknowledge={isSuper}
                 currentUserId={localUser.id || ''}
               />
