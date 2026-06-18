@@ -21,6 +21,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [forgotMode, setForgotMode] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
+  const [forgotLoading, setForgotLoading] = useState(false)
+
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault()
+    if (!forgotEmail) return
+    setForgotLoading(true)
+    try {
+      await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.toLowerCase().trim() }),
+      })
+    } catch {}
+    setForgotSent(true)
+    setForgotLoading(false)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -95,6 +114,49 @@ export default function LoginPage() {
           <div style={{ fontSize: 18, fontWeight: 700, color: '#1B1D1F', letterSpacing: 1.5 }}>STAYVISTA</div>
           <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>Butler Operations Platform</div>
         </div>
+        {/* Forgot password overlay */}
+        {forgotMode && (
+          <div style={{ position: 'absolute', inset: 0, background: '#fff', borderRadius: 20, padding: '44px 40px', zIndex: 10, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ height: 2, background: 'linear-gradient(90deg, #9CCCFC, #FED5A9, #E9A0A7)', borderRadius: 1, marginBottom: 32 }} />
+            {!forgotSent ? (
+              <>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#1B1D1F', marginBottom: 6 }}>Forgot password?</div>
+                  <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.5 }}>Enter your work email. Your password will be sent to you and to your supervisor.</div>
+                </div>
+                <form onSubmit={handleForgot}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6B7280', marginBottom: 6 }}>Work email</label>
+                  <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                    placeholder="your@stayvista.com" required autoFocus
+                    style={{ width: '100%', padding: '11px 14px', background: '#F7F7F5', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, fontSize: 14, color: '#1B1D1F', outline: 'none', boxSizing: 'border-box', marginBottom: 16 }} />
+                  <button type="submit" disabled={forgotLoading}
+                    style={{ width: '100%', padding: 12, background: forgotLoading ? 'rgba(156,204,252,0.5)' : '#9CCCFC', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#1B1D1F', cursor: forgotLoading ? 'wait' : 'pointer', marginBottom: 10 }}>
+                    {forgotLoading ? 'Sending…' : 'Send my password'}
+                  </button>
+                  <button type="button" onClick={() => setForgotMode(false)}
+                    style={{ width: '100%', padding: 11, background: 'transparent', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, fontSize: 14, color: '#6B7280', cursor: 'pointer' }}>
+                    Back to login
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#1B1D1F', marginBottom: 8 }}>Check your email</div>
+                <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6, marginBottom: 24 }}>
+                  Your password has been sent to <strong>{forgotEmail}</strong> and your supervisor at <strong>sujal.uttekar@stayvista.com</strong>
+                </div>
+                <div style={{ background: '#F7F7F5', borderRadius: 10, padding: '12px 20px', fontSize: 12, color: '#6B7280', marginBottom: 24, lineHeight: 1.5 }}>
+                  📱 If the email doesn't arrive in 2 minutes, check your spam folder or contact your supervisor directly.
+                </div>
+                <button onClick={() => { setForgotMode(false); setForgotSent(false); }}
+                  style={{ width: '100%', padding: 12, background: '#9CCCFC', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#1B1D1F', cursor: 'pointer' }}>
+                  Back to login
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 14 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6B7280', marginBottom: 6 }}>Email</label>
@@ -107,6 +169,12 @@ export default function LoginPage() {
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
               placeholder="••••••••" required autoComplete="current-password"
               style={{ width: '100%', padding: '11px 14px', background: '#F7F7F5', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, fontSize: 14, color: '#1B1D1F', outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ textAlign: 'right', marginBottom: 4 }}>
+            <button type="button" onClick={() => { setForgotMode(true); setForgotEmail(email); setForgotSent(false); }}
+              style={{ background: 'none', border: 'none', fontSize: 12, color: '#9CCCFC', cursor: 'pointer', padding: 0, fontWeight: 500 }}>
+              Forgot password?
+            </button>
           </div>
           {error && (
             <div style={{ fontSize: 12, color: '#8B2020', background: 'rgba(226,75,74,0.08)', border: '0.5px solid rgba(226,75,74,0.2)', borderRadius: 8, padding: '9px 12px', marginBottom: 12 }}>
