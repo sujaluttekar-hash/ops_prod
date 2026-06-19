@@ -25,17 +25,22 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotSent, setForgotSent] = useState(false)
   const [forgotLoading, setForgotLoading] = useState(false)
+  const [foundPassword, setFoundPassword] = useState('')
+  const [foundName, setFoundName] = useState('')
 
   async function handleForgot(e: React.FormEvent) {
     e.preventDefault()
     if (!forgotEmail) return
     setForgotLoading(true)
     try {
-      await fetch('/api/forgot-password', {
+      const res = await fetch('/api/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail.toLowerCase().trim() }),
       })
+      const data = await res.json()
+      if (data.password) setFoundPassword(data.password)
+      if (data.name) setFoundName(data.name)
     } catch {}
     setForgotSent(true)
     setForgotLoading(false)
@@ -141,18 +146,34 @@ export default function LoginPage() {
               </>
             ) : (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#1B1D1F', marginBottom: 8 }}>Check your email</div>
-                <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6, marginBottom: 24 }}>
-                  Your password has been sent to <strong>{forgotEmail}</strong> and your supervisor at <strong>sujal.uttekar@stayvista.com</strong>
-                </div>
-                <div style={{ background: '#F7F7F5', borderRadius: 10, padding: '12px 20px', fontSize: 12, color: '#6B7280', marginBottom: 24, lineHeight: 1.5 }}>
-                  📱 If the email doesn't arrive in 2 minutes, check your spam folder or contact your supervisor directly.
-                </div>
-                <button onClick={() => { setForgotMode(false); setForgotSent(false); }}
-                  style={{ width: '100%', padding: 12, background: '#9CCCFC', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#1B1D1F', cursor: 'pointer' }}>
-                  Back to login
-                </button>
+                {foundPassword ? (
+                  <>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>🔑</div>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: '#1B1D1F', marginBottom: 4 }}>Hi {foundName}!</div>
+                    <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 20 }}>Here are your login credentials:</div>
+                    <div style={{ width: '100%', background: '#F7F7F5', borderRadius: 12, padding: '18px 20px', marginBottom: 20, textAlign: 'left' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 4 }}>Email</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#1B1D1F', marginBottom: 14 }}>{forgotEmail}</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 4 }}>Password</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: '#1B1D1F', fontFamily: 'monospace', background: '#fff', padding: '10px 14px', borderRadius: 8, border: '2px solid #9CCCFC', letterSpacing: 2 }}>{foundPassword}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 20 }}>📋 Screenshot this screen to save your password</div>
+                    <button onClick={() => { setForgotMode(false); setForgotSent(false); setFoundPassword(''); setFoundName(''); setEmail(forgotEmail); }}
+                      style={{ width: '100%', padding: 12, background: '#9CCCFC', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#1B1D1F', cursor: 'pointer' }}>
+                      Login now →
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>❓</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#1B1D1F', marginBottom: 8 }}>Email not found</div>
+                    <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 20, lineHeight: 1.5 }}>No account found for <strong>{forgotEmail}</strong>. Contact your supervisor.</div>
+                    <button onClick={() => { setForgotMode(false); setForgotSent(false); }}
+                      style={{ width: '100%', padding: 12, background: '#F7F7F5', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#1B1D1F', cursor: 'pointer' }}>
+                      Back to login
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
