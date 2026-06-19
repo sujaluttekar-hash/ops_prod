@@ -53,6 +53,8 @@ export default function PerformancePage() {
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
   const [squad, setSquad] = useState('All');
+  const [viewMode, setViewMode] = useState<'all'|'tasks'|'delight'>('all');
+  const [specificDate, setSpecificDate] = useState('');
   const [data, setData] = useState<ButlerPerf[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ButlerPerf | null>(null);
@@ -65,26 +67,37 @@ export default function PerformancePage() {
   async function load() {
     setLoading(true);
     const sb = getServiceSupabase();
+    // Use wide UTC range to catch IST-stored timestamps (IST = UTC+5:30)
+    // e.g. 2026-06-01 IST = 2026-05-31T18:30:00Z — add buffer on both ends
     const start = `${year}-${String(month+1).padStart(2,'0')}-01`;
-    const end   = `${year}-${String(month+1).padStart(2,'0')}-31`;
+    const end   = new Date(year, month+1, 0).toISOString().slice(0,10); // last day of month
+    // UTC range with IST buffer: start-1day to end+1day
+    const utcStart = `${year}-${String(month+1).padStart(2,'0')}-01T00:00:00`;
+    const utcEnd   = `${end}T23:59:59`;
+    // For date-column tables use plain date strings
+    const dateStart = start;
+    const dateEnd   = end;
 
     let bQ = sb.from('profiles').select('id,name,squad').eq('role','butler').eq('is_active',true);
     if (squad !== 'All') bQ = bQ.eq('squad', squad);
     const { data: butlers } = await bQ.order('name');
 
     const [tasksR, delightsR, photosR, attR, allocR, casesR] = await Promise.all([
+      // Tasks: filter by Date: in notes OR created_at range
       sb.from('tasks').select('id,type,status,butler_id,notes,created_at,completed_at,due_time')
-        .gte('created_at',`${start}T00:00:00`).lte('created_at',`${end}T23:59:59`),
-      sb.from('guest_delights').select('id,your_name,status,created_at')
-        .gte('created_at',`${start}T00:00:00`).lte('created_at',`${end}T23:59:59`),
+        .gte('created_at', utcStart).lte('created_at', utcEnd),
+      sb.from('guest_delights').select('id,your_name,status,created_at,booking_date')
+        .or(`created_at.gte.${utcStart},booking_date.gte.${dateStart}`)
+        .lte('created_at', utcEnd),
       sb.from('delight_photos').select('id,delight_id,photo_status'),
+      // Attendance uses plain date column
       sb.from('attendance').select('butler_id,status,date')
-        .gte('date', start).lte('date', end),
+        .gte('date', dateStart).lte('date', dateEnd),
       sb.from('tasks').select('type,butler_id,notes,created_at')
         .in('type',['Check-In','Check-Out','Booking','Non Booking'])
-        .gte('created_at',`${start}T00:00:00`).lte('created_at',`${end}T23:59:59`),
+        .gte('created_at', utcStart).lte('created_at', utcEnd),
       sb.from('incidents').select('reporter_id,severity,created_at')
-        .gte('created_at',`${start}T00:00:00`).lte('created_at',`${end}T23:59:59`),
+        .gte('created_at', utcStart).lte('created_at', utcEnd),
     ]);
 
     const tasks    = tasksR.data    || [];
@@ -106,10 +119,19 @@ export default function PerformancePage() {
 
       // Tasks — match by butler_id or name in notes
       const bTasks = tasks.filter((t: any) => {
-        if (t.butler_id === b.id) return true;
-        const m = t.notes?.match(/Butler: ([^·]+)/);
-        return m && m[1].trim() === bName;
-      }).filter((t: any) => !['Check-In','Check-Out','Booking','Non Booking'].includes(t.type));
+        // Match by butler_id (most reliable)
+        const idMatch = t.butler_id === b.id;
+        // Or by name in notes
+        const nm = t.notes?.match(/Butler: ([^·]+)/);
+        const nameMatch = nm && nm[1].trim().toLowerCase() === bName.toLowerCase();
+        if (!idMatch && !nameMatch) return false;
+        // Exclude allocation types
+        if (['Check-In','Check-Out','Booking','Non Booking'].includes(t.type)) return false;
+        // Verify within month using Date: from notes OR created_at
+        const dateFromNotes = t.notes?.match(/Date: (\d{4}-\d{2}-\d{2})/)?.[1];
+        const dateStr = dateFromNotes || (t.created_at || '').slice(0, 10);
+        return dateStr >= start && dateStr <= end;
+      });
 
       const done = bTasks.filter((t: any) => t.status === 'completed');
       // Response time: minutes from created_at to completed_at
@@ -130,7 +152,14 @@ export default function PerformancePage() {
       });
 
       // Delights
-      const bDelights = delights.filter((d: any) => d.your_name === bName);
+      const bDelights = delights.filter((d: any) => {
+        if (!d.your_name) return false;
+        // case-insensitive name match
+        if (d.your_name.trim().toLowerCase() !== bName.trim().toLowerCase()) return false;
+        // check booking_date or created_at is within the month
+        const dateStr = d.booking_date || (d.created_at || '').slice(0, 10);
+        return dateStr >= start && dateStr <= end;
+      });
       let photosUp = 0, photosApp = 0, photosDec = 0;
       bDelights.forEach((d: any) => {
         const ps = photosByDelight[d.id] || [];
@@ -140,16 +169,24 @@ export default function PerformancePage() {
       });
 
       // Attendance
-      const bAtt = att.filter((a: any) => a.butler_id === b.id);
+      const bAtt = att.filter((a: any) => {
+        if (a.butler_id !== b.id) return false;
+        return a.date >= start && a.date <= end;
+      });
       const present = bAtt.filter((a: any) => a.status === 'present').length;
       const absent  = bAtt.filter((a: any) => a.status === 'absent').length;
       const half    = bAtt.filter((a: any) => a.status === 'half_day').length;
 
       // Allocation
       const bAlloc = alloc.filter((t: any) => {
-        if (t.butler_id === b.id) return true;
-        const m = t.notes?.match(/Butler: ([^·]+)/);
-        return m && m[1].trim() === bName;
+        const idMatch = t.butler_id === b.id;
+        const nm = t.notes?.match(/Butler: ([^·]+)/);
+        const nameMatch = nm && nm[1].trim().toLowerCase() === bName.toLowerCase();
+        if (!idMatch && !nameMatch) return false;
+        // Verify date is within month
+        const dateFromNotes = t.notes?.match(/Date: (\d{4}-\d{2}-\d{2})/)?.[1];
+        const dateStr = dateFromNotes || (t.created_at || '').slice(0, 10);
+        return dateStr >= start && dateStr <= end;
       });
       const daysAllocated = bAlloc.length;
       const checkIns  = bAlloc.filter((t: any) => t.type === 'Check-In').length;
@@ -213,15 +250,25 @@ export default function PerformancePage() {
 
   return (
     <>
-      <Topbar title="Butler performance" subtitle={`${MONTHS[month]} ${year} · Quality, attendance & task metrics`}
+      <Topbar title="Butler performance" subtitle={`${specificDate ? specificDate : MONTHS[month]+' '+year} · ${viewMode === 'all' ? 'All metrics' : viewMode === 'tasks' ? 'Tasks focus' : 'Delight focus'}`}
         actions={
-          <div style={{ display: 'flex', gap: 6 }}>
-            <select value={month} onChange={e => setMonth(+e.target.value)} style={sel('m')}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {/* View mode */}
+            <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} style={sel('v')}>
+              <option value="all">All metrics</option>
+              <option value="tasks">Tasks only</option>
+              <option value="delight">Delight only</option>
+            </select>
+            {/* Date filters */}
+            <select value={month} onChange={e => { setMonth(+e.target.value); setSpecificDate(''); }} style={sel('m')}>
               {MONTHS.map((m,i) => <option key={i} value={i}>{m}</option>)}
             </select>
             <select value={year} onChange={e => setYear(+e.target.value)} style={sel('y')}>
               {[2025,2026,2027].map(y => <option key={y}>{y}</option>)}
             </select>
+            <input type="date" value={specificDate} onChange={e => setSpecificDate(e.target.value)}
+              style={{ ...sel('d'), fontSize: 11 }} title="Filter to specific date" />
+            {specificDate && <button onClick={() => setSpecificDate('')} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 7, border: '1px solid #E9A0A7', background: 'rgba(233,160,167,0.1)', color: '#8B2020', cursor: 'pointer' }}>✕ Clear date</button>}
             <select value={squad} onChange={e => setSquad(e.target.value)} style={sel('s')}>
               {['All','Lonavala','Karjat','Nashik','Alibaug'].map(s => <option key={s}>{s}</option>)}
             </select>
@@ -283,7 +330,7 @@ export default function PerformancePage() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
 
                         {/* Tasks block */}
-                        <div style={{ background: 'rgba(156,204,252,0.08)', borderRadius: 10, padding: '12px 14px' }}>
+                        {(viewMode === 'all' || viewMode === 'tasks') && (<div style={{ background: 'rgba(156,204,252,0.08)', borderRadius: 10, padding: '12px 14px' }}>
                           <div style={{ fontSize: 10, fontWeight: 700, color: '#0C447C', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>✓ Tasks</div>
                           {[
                             ['Assigned', b.tasksTotal],
@@ -296,10 +343,10 @@ export default function PerformancePage() {
                               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sv-dark)' }}>{v}</span>
                             </div>
                           ))}
-                        </div>
+                        </div>)}
 
                         {/* Photo quality block */}
-                        <div style={{ background: 'rgba(151,196,89,0.08)', borderRadius: 10, padding: '12px 14px' }}>
+                        {(viewMode === 'all' || viewMode === 'delight') && (<div style={{ background: 'rgba(151,196,89,0.08)', borderRadius: 10, padding: '12px 14px' }}>
                           <div style={{ fontSize: 10, fontWeight: 700, color: '#2D5A0E', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>🎁 Photo quality</div>
                           {[
                             ['Delights logged', b.delightsTotal],
@@ -313,7 +360,7 @@ export default function PerformancePage() {
                               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sv-dark)' }}>{v}</span>
                             </div>
                           ))}
-                        </div>
+                        </div>)}
 
                         {/* Attendance block */}
                         <div style={{ background: 'rgba(254,213,169,0.12)', borderRadius: 10, padding: '12px 14px' }}>
