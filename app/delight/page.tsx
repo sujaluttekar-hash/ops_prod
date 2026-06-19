@@ -332,11 +332,11 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
               </button>
             )
           )}
-          {canEdit ? (
+          {canAcknowledge && (canEdit ? (
             <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={onEdit}>✏️ Edit</button>
           ) : (
             <span style={{ fontSize: 10, color: 'var(--muted-fg)', padding: '4px 8px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.08)' }}>🔒 {editLockedMsg}</span>
-          )}
+          ))}
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setExpanded(v => !v)}>
             {expanded ? '▲' : `📷 ${photos.length}`}
           </button>

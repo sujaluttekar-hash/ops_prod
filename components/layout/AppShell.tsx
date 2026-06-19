@@ -28,6 +28,7 @@ const navByRole: Record<string, NavSection> = {
     admin: [
       { label: 'Credentials', href: '/credentials', icon: '🔐' },
       { label: 'MIS & Reports', href: '/reports', icon: '📈' },
+      { label: 'Butler performance', href: '/performance', icon: '🏆' },
       { label: 'Help & Guide', href: '/guide', icon: '📖' },
       { label: 'Management', href: '/management', icon: '⚙' },
     ],
