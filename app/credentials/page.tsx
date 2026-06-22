@@ -41,16 +41,22 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     const uuid = crypto.randomUUID();
 
     // Save to profiles with password_hash so login can auth them
-    const { error: err } = await getServiceSupabase().from('profiles').insert({
-      id: uuid,
-      name: form.name,
-      email: form.email,
-      role: form.role,
-      squad: form.squad || null,
-      is_active: true,
-      password_hash: form.password,  // plain text for local auth
+    let err: any = null;
+    // Try with password_hash, fallback without if column missing
+    const { error: e1 } = await getServiceSupabase().from('profiles').insert({
+      id: uuid, name: form.name, email: form.email, role: form.role,
+      squad: form.squad || null, is_active: true, password_hash: form.password,
       created_at: new Date().toISOString(),
     });
+    err = e1;
+    if (err?.message?.includes('password_hash')) {
+      const { error: e2 } = await getServiceSupabase().from('profiles').insert({
+        id: uuid, name: form.name, email: form.email, role: form.role,
+        squad: form.squad || null, is_active: true,
+        created_at: new Date().toISOString(),
+      });
+      err = e2;
+    }
 
     if (err) { setError(err.message); setSaving(false); return; }
 
@@ -148,12 +154,22 @@ export default function CredentialsPage() {
 
     if (!db && staticUser) {
       // Profile not in DB yet — insert it so we can toggle it
-      const { error: insErr } = await sb.from('profiles').insert({
+      // Try with password_hash first, fallback without it if column doesn't exist
+      let insErr: any = null;
+      const { error: e1 } = await sb.from('profiles').insert({
         id: staticUser.id, name: staticUser.name, email: staticUser.email,
         role: staticUser.role, squad: staticUser.squad || null,
-        is_active: !currentStatus, // set to the NEW value directly
-        password_hash: staticUser.password,
+        is_active: !currentStatus, password_hash: staticUser.password,
       });
+      insErr = e1;
+      if (insErr?.message?.includes('password_hash')) {
+        const { error: e2 } = await sb.from('profiles').insert({
+          id: staticUser.id, name: staticUser.name, email: staticUser.email,
+          role: staticUser.role, squad: staticUser.squad || null,
+          is_active: !currentStatus,
+        });
+        insErr = e2;
+      }
       if (insErr && !insErr.message.includes('duplicate')) {
         alert('Error inserting profile: ' + insErr.message); return;
       }
