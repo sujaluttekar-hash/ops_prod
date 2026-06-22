@@ -40,25 +40,42 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
     const uuid = crypto.randomUUID();
 
-    // Save to profiles with password_hash so login can auth them
-    let err: any = null;
-    // Try with password_hash, fallback without if column missing
-    const { error: e1 } = await getServiceSupabase().from('profiles').insert({
-      id: uuid, name: form.name, email: form.email, role: form.role,
-      squad: form.squad || null, is_active: true, password_hash: form.password,
-      created_at: new Date().toISOString(),
-    });
-    err = e1;
-    if (err?.message?.includes('password_hash')) {
-      const { error: e2 } = await getServiceSupabase().from('profiles').insert({
-        id: uuid, name: form.name, email: form.email, role: form.role,
-        squad: form.squad || null, is_active: true,
+    // Use REST API directly to bypass Supabase schema cache issues with password_hash
+    const SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA';
+    const insertRes = await fetch('https://ryuxwnbrdsjwzwdimynd.supabase.co/rest/v1/profiles', {
+      method: 'POST',
+      headers: {
+        'apikey': SVC,
+        'Authorization': 'Bearer ' + SVC,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        id: uuid,
+        name: form.name,
+        email: form.email,
+        role: form.role,
+        squad: form.squad || null,
+        is_active: true,
+        password_hash: form.password,
         created_at: new Date().toISOString(),
-      });
-      err = e2;
-    }
+      }),
+    });
 
-    if (err) { setError(err.message); setSaving(false); return; }
+    if (!insertRes.ok) {
+      const errBody = await insertRes.text();
+      // If password_hash column missing, retry without it
+      if (errBody.includes('password_hash')) {
+        const retryRes = await fetch('https://ryuxwnbrdsjwzwdimynd.supabase.co/rest/v1/profiles', {
+          method: 'POST',
+          headers: { 'apikey': SVC, 'Authorization': 'Bearer ' + SVC, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ id: uuid, name: form.name, email: form.email, role: form.role, squad: form.squad || null, is_active: true, created_at: new Date().toISOString() }),
+        });
+        if (!retryRes.ok) { setError(await retryRes.text()); setSaving(false); return; }
+      } else {
+        setError(errBody); setSaving(false); return;
+      }
+    }
 
     setSaving(false);
     onSaved();
