@@ -142,11 +142,27 @@ export default function CredentialsPage() {
   useEffect(() => { load(); }, []);
 
   async function toggleActive(email: string, currentStatus: boolean) {
+    const sb = getServiceSupabase();
     const db = dbProfiles.find(p => p.email === email);
-    if (!db) { alert('Profile not found in DB. User may not be in the database yet.'); return; }
-    const { error } = await getServiceSupabase().from('profiles').update({ is_active: !currentStatus }).eq('id', db.id);
+    const staticUser = APP_ACCOUNTS.find(a => a.email === email);
+
+    if (!db && staticUser) {
+      // Profile not in DB yet — insert it so we can toggle it
+      const { error: insErr } = await sb.from('profiles').insert({
+        id: staticUser.id, name: staticUser.name, email: staticUser.email,
+        role: staticUser.role, squad: staticUser.squad || null,
+        is_active: !currentStatus, // set to the NEW value directly
+        password_hash: staticUser.password,
+      });
+      if (insErr && !insErr.message.includes('duplicate')) {
+        alert('Error inserting profile: ' + insErr.message); return;
+      }
+      setDbProfiles(prev => [...prev, { ...staticUser, is_active: !currentStatus }]);
+      return;
+    }
+    if (!db) { alert('Profile not found in DB.'); return; }
+    const { error } = await sb.from('profiles').update({ is_active: !currentStatus }).eq('id', db.id);
     if (error) { alert('Error: ' + error.message); return; }
-    // Refresh DB profiles so UI reflects the change immediately
     setDbProfiles(prev => prev.map(p => p.id === db.id ? { ...p, is_active: !currentStatus } : p));
   }
 

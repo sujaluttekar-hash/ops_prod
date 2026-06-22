@@ -53,7 +53,7 @@ export default function LoginPage() {
 
     const key = email.toLowerCase().trim()
 
-    // 1. Check hardcoded USERS first (fast, no network)
+    // 1. Check hardcoded USERS first (fast)
     const match = USERS[key]
     if (match) {
       if (match.password !== password) {
@@ -61,6 +61,25 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
+      // Check is_active in DB — hardcoded users can be deactivated via credentials tab
+      try {
+        const activeRes = await fetch(
+          `https://ryuxwnbrdsjwzwdimynd.supabase.co/rest/v1/profiles?id=eq.${match.id}&select=is_active`,
+          {
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA',
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA',
+            }
+          }
+        )
+        const rows = await activeRes.json()
+        if (Array.isArray(rows) && rows.length > 0 && rows[0].is_active === false) {
+          setError('This account has been deactivated. Contact your admin.')
+          setLoading(false)
+          return
+        }
+      } catch {} // If DB check fails, allow login (fail-open for reliability)
+
       localStorage.setItem('sv_local_session', JSON.stringify({
         id: match.id, name: match.name, email: key,
         role: match.role, squad: match.squad,
