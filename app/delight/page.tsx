@@ -114,6 +114,111 @@ function CategoryCard({ cat, photo, existingPhoto, subtypes, onPhoto, onSubtype 
 }
 
 
+
+// ── Booking ID Search ─────────────────────────────────────────
+function BookingSearch({ value, onChange, onSelect }: {
+  value: string;
+  onChange: (v: string) => void;
+  onSelect: (b: { booking_id: string; villa_name: string; checkin: string; guest_name: string }) => void;
+}) {
+  const [query, setQuery] = useState(value);
+  const [results, setResults] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => { setQuery(value); }, [value]);
+
+  function handleChange(v: string) {
+    setQuery(v);
+    onChange(v);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (v.length < 2) { setResults([]); setOpen(false); return; }
+    setSearching(true);
+    timerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/booking-search?q=${encodeURIComponent(v)}`);
+        const d = await res.json();
+        setResults(d.results || []);
+        setOpen(true);
+      } catch {}
+      setSearching(false);
+    }, 400);
+  }
+
+  function handleSelect(b: any) {
+    setQuery(b.booking_id);
+    onChange(b.booking_id);
+    onSelect(b);
+    setOpen(false);
+    setResults([]);
+  }
+
+  // Convert DD-Mon-YYYY to YYYY-MM-DD
+  function parseDate(s: string) {
+    if (!s || s === 'NA') return '';
+    try {
+      const months: Record<string,string> = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+      const [d, mon, y] = s.split('-');
+      if (!d || !mon || !y) return '';
+      return `${y}-${months[mon] || '01'}-${d.padStart(2,'0')}`;
+    } catch { return ''; }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <input className="sv-input" style={{ width: '100%', paddingRight: 32 }}
+          placeholder="Search by booking ID or guest name…"
+          value={query}
+          onChange={e => handleChange(e.target.value)}
+          onFocus={() => query.length >= 2 && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+        />
+        {searching && (
+          <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--muted-fg)' }}>⟳</div>
+        )}
+      </div>
+
+      {open && results.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 280, overflowY: 'auto', marginTop: 3 }}>
+          {results.map((b: any) => (
+            <div key={b.booking_id} onMouseDown={() => handleSelect({ ...b, checkin: parseDate(b.checkin) })}
+              style={{ padding: '11px 14px', borderBottom: '0.5px solid rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'background 0.1s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#F7F7F5')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sv-dark)' }}>#{b.booking_id}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>{b.guest_name}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#0C447C' }}>{b.villa_name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 1 }}>{b.checkin} → {b.checkout}</div>
+                </div>
+              </div>
+              {(b.rating && b.rating !== 'NA') && (
+                <div style={{ marginTop: 4, fontSize: 10, color: b.rating >= '4' ? '#2D5A0E' : '#8B2020', fontWeight: 700 }}>
+                  ⭐ {b.rating}/5 on {b.platform}
+                </div>
+              )}
+              {b.guest_registration === '1' && (
+                <div style={{ marginTop: 2, fontSize: 10, color: '#2D5A0E' }}>✅ Guest registered</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {open && results.length === 0 && query.length >= 2 && !searching && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '12px 14px', marginTop: 3, fontSize: 12, color: 'var(--muted-fg)' }}>
+          No booking found for "{query}"
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Booking Insight Widget ─────────────────────────────────────
 function BookingInsight({ bookingId }: { bookingId: string }) {
   const [data, setData] = useState<any>(null);
@@ -247,6 +352,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
   const uploadedCount = CATEGORIES.filter(cat => photos[cat.key] || existingPhotos[cat.key]).length;
 
   async function handleSave() {
+    if (!form.booking_id) { setError('Please enter or search a Booking ID'); return; }
     if (!form.villa_name) { setError('Please select a villa'); return; }
     if (!form.booking_date) { setError('Please set a booking date'); return; }
     if (uploadedCount === 0 && !isEdit) { setError('Please upload at least one photo'); return; }
@@ -337,8 +443,17 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         </div>
 
         <div style={{ marginBottom: form.booking_id ? 8 : 12 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking ID</div>
-          <input className="sv-input" style={{ width: '100%' }} placeholder="e.g. 1228519 (optional)" value={form.booking_id} onChange={f('booking_id')} />
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking ID *</div>
+          <BookingSearch
+            value={form.booking_id}
+            onChange={v => setForm(p => ({ ...p, booking_id: v }))}
+            onSelect={b => setForm(p => ({
+              ...p,
+              booking_id: b.booking_id,
+              villa_name: b.villa_name || p.villa_name,
+              booking_date: b.checkin || p.booking_date,
+            }))}
+          />
         </div>
         <BookingInsight bookingId={form.booking_id} />
 
