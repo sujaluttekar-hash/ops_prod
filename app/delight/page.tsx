@@ -225,13 +225,23 @@ function BookingSearch({ value, onChange, onSelect }: {
 // ── Redash inline status badge ────────────────────────────────
 function RedashStatusBadges({ bookingId }: { bookingId: string }) {
   const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     if (!bookingId) return;
+    setLoading(true);
     fetch(`/api/booking-lookup?booking_id=${encodeURIComponent(bookingId)}`)
-      .then(r => r.json()).then(setData).catch(() => {});
+      .then(r => r.json()).then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
   }, [bookingId]);
 
-  if (!data?.found) return null;
+  if (loading) return (
+    <div style={{ display: 'flex', gap: 5, marginTop: 4 }}>
+      <span style={{ fontSize: 9.5, padding: '2px 8px', borderRadius: 20, background: 'rgba(0,0,0,0.05)', color: 'var(--muted-fg)' }}>🔍 Checking booking…</span>
+    </div>
+  );
+  if (!data?.found) return (
+    <span style={{ fontSize: 9.5, padding: '2px 8px', borderRadius: 20, background: 'rgba(233,160,167,0.1)', color: '#8B2020', marginTop: 4, display: 'inline-block' }}>⚠ Booking not in Redash</span>
+  );
   const reg = data.registration;
   const feed = data.feedback;
 
