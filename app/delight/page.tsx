@@ -221,6 +221,46 @@ function BookingSearch({ value, onChange, onSelect }: {
   );
 }
 
+
+// ── Redash inline status badge ────────────────────────────────
+function RedashStatusBadges({ bookingId }: { bookingId: string }) {
+  const [data, setData] = useState<any>(null);
+  useEffect(() => {
+    if (!bookingId) return;
+    fetch(`/api/booking-lookup?booking_id=${encodeURIComponent(bookingId)}`)
+      .then(r => r.json()).then(setData).catch(() => {});
+  }, [bookingId]);
+
+  if (!data?.found) return null;
+  const reg = data.registration;
+  const feed = data.feedback;
+
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
+      {reg && (
+        <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+          background: reg.guest_registration === '1' ? 'rgba(151,196,89,0.12)' : 'rgba(233,160,167,0.12)',
+          color: reg.guest_registration === '1' ? '#2D5A0E' : '#8B2020' }}>
+          {reg.guest_registration === '1' ? '✅ Guest registered' : '❌ Not registered'}
+        </span>
+      )}
+      {feed?.rating && feed.rating !== 'NA' && (
+        <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+          background: parseFloat(feed.rating) >= 4 ? 'rgba(151,196,89,0.12)' : 'rgba(233,160,167,0.12)',
+          color: parseFloat(feed.rating) >= 4 ? '#2D5A0E' : '#8B2020' }}>
+          ⭐ {feed.rating}/5 · {feed.platform}
+        </span>
+      )}
+      {reg && !feed?.rating && (
+        <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+          background: 'rgba(254,213,169,0.15)', color: '#7A4A08' }}>
+          📝 No feedback yet
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Booking Insight Widget ─────────────────────────────────────
 function BookingInsight({ bookingId }: { bookingId: string }) {
   const [data, setData] = useState<any>(null);
@@ -540,8 +580,9 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
             {ackCount > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(151,196,89,0.12)', color: '#2D5A0E' }}>✅ Acknowledged</span>}
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
-            {entry.your_name} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}{entry.booking_id ? ` · #${entry.booking_id}` : ''}
+            {entry.your_name}{entry.squad ? ` · ${entry.squad}` : ''} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}{entry.booking_id ? ` · #${entry.booking_id}` : ''}
           </div>
+          {entry.booking_id && <RedashStatusBadges bookingId={entry.booking_id} />}
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {canAcknowledge && (
