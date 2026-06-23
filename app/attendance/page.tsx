@@ -136,7 +136,7 @@ export default function AttendancePage() {
             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="sv-input" style={{ fontSize: 12, padding: '5px 8px' }} />
             {isSuper && (
               <select value={squad} onChange={e => setSquad(e.target.value)} className="sv-select" style={{ fontSize: 12, padding: '5px 8px' }}>
-                {['All','Lonavala','Karjat','Nashik','Alibaug'].map(s => <option key={s}>{s}</option>)}
+                {['All','Lonavala','Karjat','Nashik','Alibaug','Pune'].map(s => <option key={s}>{s}</option>)}
               </select>
             )}
           </div>

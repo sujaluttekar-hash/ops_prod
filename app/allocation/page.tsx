@@ -216,7 +216,7 @@ export default function AllocationPage() {
             </div>
             {view === 'daily' && (
               <select value={squad} onChange={e => setSquad(e.target.value)} className="sv-select" style={{ fontSize: 12 }}>
-                {['All','Lonavala','Karjat','Nashik','Alibaug'].map(s => <option key={s}>{s}</option>)}
+                {['All','Lonavala','Karjat','Nashik','Alibaug','Pune'].map(s => <option key={s}>{s}</option>)}
               </select>
             )}
             {saveMsg && <span style={{ fontSize: 12, color: '#2D5A0E', fontWeight: 600 }}>{saveMsg}</span>}

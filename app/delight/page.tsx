@@ -485,7 +485,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Squad</div>
             <select className="sv-select" style={{ width: '100%' }} value={form.squad} onChange={f('squad')}>
               <option value="">Select…</option>
-              {['Lonavala','Karjat','Nashik','Alibaug'].map(s => <option key={s}>{s}</option>)}
+              {['Lonavala','Karjat','Nashik','Alibaug','Pune'].map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
         </div>

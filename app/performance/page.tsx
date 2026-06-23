@@ -270,7 +270,7 @@ export default function PerformancePage() {
               style={{ ...sel('d'), fontSize: 11 }} title="Filter to specific date" />
             {specificDate && <button onClick={() => setSpecificDate('')} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 7, border: '1px solid #E9A0A7', background: 'rgba(233,160,167,0.1)', color: '#8B2020', cursor: 'pointer' }}>✕ Clear date</button>}
             <select value={squad} onChange={e => setSquad(e.target.value)} style={sel('s')}>
-              {['All','Lonavala','Karjat','Nashik','Alibaug'].map(s => <option key={s}>{s}</option>)}
+              {['All','Lonavala','Karjat','Nashik','Alibaug','Pune'].map(s => <option key={s}>{s}</option>)}
             </select>
             <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={exportCSV}>⬇ CSV</button>
           </div>

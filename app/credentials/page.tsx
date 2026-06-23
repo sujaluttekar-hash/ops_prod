@@ -117,7 +117,7 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           <div>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Squad</div>
             <select className="sv-select" style={{ width: '100%' }} value={form.squad} onChange={e => setForm(p => ({ ...p, squad: e.target.value }))}>
-              {['Lonavala','Karjat','Nashik','Alibaug','All'].map(s => <option key={s}>{s}</option>)}
+              {['Lonavala','Karjat','Nashik','Alibaug','Pune','All'].map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
         </div>
