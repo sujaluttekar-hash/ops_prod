@@ -113,6 +113,109 @@ function CategoryCard({ cat, photo, existingPhoto, subtypes, onPhoto, onSubtype 
   );
 }
 
+
+// ── Booking Insight Widget ─────────────────────────────────────
+function BookingInsight({ bookingId }: { bookingId: string }) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState('');
+
+  useEffect(() => {
+    if (!bookingId || bookingId.length < 4 || bookingId === fetched) return;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/booking-lookup?booking_id=${encodeURIComponent(bookingId)}`);
+        const d = await res.json();
+        setData(d);
+        setFetched(bookingId);
+      } catch {}
+      setLoading(false);
+    }, 800); // debounce
+    return () => clearTimeout(timer);
+  }, [bookingId]);
+
+  if (!bookingId || bookingId.length < 4) return null;
+  if (loading) return (
+    <div style={{ padding: '10px 14px', background: 'rgba(156,204,252,0.08)', borderRadius: 10, fontSize: 12, color: '#0C447C', marginBottom: 14 }}>
+      🔍 Looking up booking {bookingId}…
+    </div>
+  );
+  if (!data) return null;
+
+  const reg = data.registration;
+  const feed = data.feedback;
+
+  if (!data.found) return (
+    <div style={{ padding: '10px 14px', background: 'rgba(233,160,167,0.08)', border: '1px solid #E9A0A7', borderRadius: 10, fontSize: 12, color: '#8B2020', marginBottom: 14 }}>
+      ⚠ Booking <strong>{bookingId}</strong> not found in Redash. Double-check the ID.
+    </div>
+  );
+
+  return (
+    <div style={{ background: 'rgba(151,196,89,0.06)', border: '1px solid rgba(151,196,89,0.3)', borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#2D5A0E', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>✅ Booking found — {bookingId}</div>
+      
+      {reg && (
+        <div style={{ marginBottom: feed ? 10 : 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sv-dark)', marginBottom: 6 }}>📋 Guest Registration</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            {[
+              ['Guest', reg.guest_name],
+              ['Villa', reg.property_name],
+              ['Check-in', reg.checkin],
+              ['Pax', reg.pax],
+              ['Guest details', reg.guest_details_pct],
+              ['ID collected', reg.id_pct],
+              ['Indemnity', reg.indemnity_pct],
+              ['Registration', reg.guest_registration === '1' ? '✅ Complete' : '❌ Incomplete'],
+            ].map(([k, v]) => (
+              <div key={k as string} style={{ fontSize: 11 }}>
+                <span style={{ color: 'var(--muted-fg)' }}>{k}: </span>
+                <span style={{ fontWeight: 600, color: (k === 'Registration' && String(v).includes('❌')) ? '#8B2020' : 'var(--sv-dark)' }}>{v || '—'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {feed && (
+        <div style={{ marginTop: reg ? 10 : 0, paddingTop: reg ? 10 : 0, borderTop: reg ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sv-dark)', marginBottom: 6 }}>
+            ⭐ Guest Feedback
+            {feed.rating && feed.rating !== 'NA' && (
+              <span style={{ marginLeft: 8, fontSize: 13, color: feed.rating >= '4' ? '#2D5A0E' : '#8B2020', fontWeight: 800 }}>
+                {feed.rating}/5
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: feed.comment && feed.comment !== 'NA' ? 8 : 0 }}>
+            {[
+              ['Platform', feed.platform],
+              ['Date', feed.feedback_date],
+              ['Meals rating', feed.meals_rating !== 'NA' ? feed.meals_rating : null],
+            ].filter(([,v]) => v && v !== 'NA').map(([k, v]) => (
+              <div key={k as string} style={{ fontSize: 11 }}>
+                <span style={{ color: 'var(--muted-fg)' }}>{k}: </span>
+                <span style={{ fontWeight: 600 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          {feed.comment && feed.comment !== 'NA' && (
+            <div style={{ fontSize: 11, color: 'var(--sv-dark)', background: '#fff', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', fontStyle: 'italic', lineHeight: 1.5 }}>
+              "{feed.comment}"
+            </div>
+          )}
+        </div>
+      )}
+
+      {!reg && !feed && data.found && (
+        <div style={{ fontSize: 11, color: 'var(--muted-fg)' }}>Booking found but no registration or feedback data yet.</div>
+      )}
+    </div>
+  );
+}
+
 // ── Log / Edit Modal ──────────────────────────────────────────
 function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: any; onClose: () => void; onSaved: () => void; defaultUser: any }) {
   const isEdit = !!editEntry;
@@ -233,10 +336,11 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
           <VillaSearch value={form.villa_name} onChange={v => setForm(p => ({ ...p, villa_name: v }))} />
         </div>
 
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: form.booking_id ? 8 : 12 }}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking ID</div>
-          <input className="sv-input" style={{ width: '100%' }} placeholder="e.g. BK-2026-1234 (optional)" value={form.booking_id} onChange={f('booking_id')} />
+          <input className="sv-input" style={{ width: '100%' }} placeholder="e.g. 1228519 (optional)" value={form.booking_id} onChange={f('booking_id')} />
         </div>
+        <BookingInsight bookingId={form.booking_id} />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
           <div>
