@@ -121,7 +121,7 @@ function CategoryCard({ cat, photo, existingPhoto, subtypes, onPhoto, onSubtype 
 function BookingSearch({ value, onChange, onSelect }: {
   value: string;
   onChange: (v: string) => void;
-  onSelect: (b: { booking_id: string; villa_name: string; checkin: string; guest_name: string }) => void;
+  onSelect: (b: { booking_id: string; villa_name: string; checkin: string; guest_name: string; squad?: string }) => void;
 }) {
   const [query, setQuery] = useState(value);
   const [results, setResults] = useState<any[]>([]);
