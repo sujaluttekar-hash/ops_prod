@@ -226,6 +226,7 @@ function BookingSearch({ value, onChange, onSelect }: {
 function RedashStatusBadges({ bookingId }: { bookingId: string }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [bookingData, setBookingData] = useState<Record<string,any>>({});
   useEffect(() => {
     if (!bookingId) return;
     setLoading(true);
@@ -567,7 +568,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
 }
 
 // ── Entry card ────────────────────────────────────────────────
-function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoAction, canAcknowledge, currentUserId }: { entry: any; onEdit: () => void; onAcknowledge: () => void; onUnacknowledge: () => void; onPhotoAction: (photoId: string, action: 'approved' | 'declined') => void; canAcknowledge: boolean; currentUserId: string }) {
+function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoAction, canAcknowledge, currentUserId, bookingInfo }: { entry: any; onEdit: () => void; onAcknowledge: () => void; onUnacknowledge: () => void; onPhotoAction: (photoId: string, action: 'approved' | 'declined') => void; canAcknowledge: boolean; currentUserId: string; bookingInfo?: any }) {
   const [expanded, setExpanded] = useState(false);
   const acks = entry.acknowledged_by || [];
   const hasAcked = acks.includes(currentUserId);
@@ -601,7 +602,35 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
           <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
             {entry.your_name}{entry.squad ? ` · ${entry.squad}` : ''} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}{entry.booking_id ? ` · #${entry.booking_id}` : ''}
           </div>
-          {entry.booking_id && <RedashStatusBadges bookingId={entry.booking_id} />}
+          {entry.booking_id && bookingInfo && (
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
+              {bookingInfo.found === false ? (
+                <span style={{ fontSize: 9.5, padding: '2px 8px', borderRadius: 20, background: 'rgba(233,160,167,0.1)', color: '#8B2020' }}>⚠ Booking not in Redash</span>
+              ) : (
+                <>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                    background: bookingInfo.guest_registration ? 'rgba(151,196,89,0.12)' : 'rgba(233,160,167,0.12)',
+                    color: bookingInfo.guest_registration ? '#2D5A0E' : '#8B2020' }}>
+                    {bookingInfo.guest_registration ? '✅ Guest registered' : '❌ Not registered'}
+                  </span>
+                  {bookingInfo.rating ? (
+                    <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                      background: parseFloat(bookingInfo.rating) >= 4 ? 'rgba(151,196,89,0.12)' : 'rgba(233,160,167,0.12)',
+                      color: parseFloat(bookingInfo.rating) >= 4 ? '#2D5A0E' : '#8B2020' }}>
+                      ⭐ {bookingInfo.rating}/5{bookingInfo.platform ? ` · ${bookingInfo.platform}` : ''}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(254,213,169,0.15)', color: '#7A4A08' }}>
+                      📝 No feedback yet
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {entry.booking_id && !bookingInfo && (
+            <span style={{ fontSize: 9.5, color: 'var(--muted-fg)', marginTop: 4, display: 'inline-block' }}>🔍 Loading…</span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {canAcknowledge && (
@@ -681,6 +710,7 @@ export default function DelightPage() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bookingData, setBookingData] = useState<Record<string,any>>({});
   const [showModal, setShowModal] = useState(false);
   const [editEntry, setEditEntry] = useState<any | null>(null);
   const [tab, setTab] = useState<'all' | 'in_progress' | 'completed' | 'requests'>('all');
@@ -713,6 +743,20 @@ export default function DelightPage() {
       }));
 
       setEntries(merged);
+
+      // Batch fetch all booking IDs from Redash in one call
+      const ids = merged.map((e: any) => e.booking_id).filter(Boolean);
+      if (ids.length > 0) {
+        try {
+          const br = await fetch('/api/booking-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ booking_ids: ids }),
+          });
+          const bd = await br.json();
+          setBookingData(bd);
+        } catch {}
+      }
     } catch (e) {
       console.error('load error:', e);
       setEntries([]);
@@ -841,6 +885,7 @@ export default function DelightPage() {
                 onPhotoAction={handlePhotoAction}
                 canAcknowledge={isSuper}
                 currentUserId={localUser.id || ''}
+                bookingInfo={bookingData[entry.booking_id] || null}
               />
             ))}
           </div>
