@@ -24,16 +24,18 @@ type PhotoVal = { file: File; preview: string; timestamp: string } | null;
 function VillaSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [q, setQ] = useState(value);
   const [open, setOpen] = useState(false);
+  // Sync internal state when parent sets value programmatically (e.g. from booking auto-fill)
+  useEffect(() => { setQ(value); }, [value]);
   const results = q.length > 0 ? PROPERTIES.filter((p: any) => p.name.toLowerCase().includes(q.toLowerCase())).slice(0, 10) : [];
   return (
     <div style={{ position: 'relative' }}>
       <input className="sv-input" style={{ width: '100%' }} placeholder="Search villa…" value={q}
-        onChange={e => { setQ(e.target.value); onChange(''); setOpen(true); }}
+        onChange={e => { setQ(e.target.value); onChange(e.target.value); setOpen(e.target.value.length > 0); }}
         onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 180)} />
       {open && results.length > 0 && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: '#fff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, boxShadow: '0 8px 20px rgba(0,0,0,0.12)', maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
           {results.map((p: any) => (
-            <div key={p.id} onMouseDown={() => { setQ(p.name); onChange(p.name); setOpen(false); }}
+            <div key={p.id} onMouseDown={() => { setQ(p.name); onChange(p.name); setOpen(false); setQ(p.name); }}
               style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '0.5px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.squad === 'Lonavala' ? '#9CCCFC' : '#97C459', flexShrink: 0 }} />
               <div><div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div><div style={{ fontSize: 10, color: 'var(--muted-fg)' }}>{p.squad}</div></div>
@@ -352,8 +354,9 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
   const uploadedCount = CATEGORIES.filter(cat => photos[cat.key] || existingPhotos[cat.key]).length;
 
   async function handleSave() {
-    if (!form.booking_id) { setError('Please enter or search a Booking ID'); return; }
-    if (!form.villa_name) { setError('Please select a villa'); return; }
+    if (!form.booking_id) { setError('Please search and select a Booking ID'); return; }
+    // villa_name is set either from VillaSearch selection or from booking auto-fill
+    if (!form.villa_name) { setError('Villa is required — it auto-fills when you select a booking'); return; }
     if (!form.booking_date) { setError('Please set a booking date'); return; }
     if (uploadedCount === 0 && !isEdit) { setError('Please upload at least one photo'); return; }
     setSaving(true); setError('');
