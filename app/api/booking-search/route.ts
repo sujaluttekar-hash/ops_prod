@@ -53,6 +53,7 @@ async function getAllBookings() {
       id_pct:       r['IDs Collection%'],
       indemnity_pct: r['Indemnity Collection %'],
       guest_registration: r['Guest Registration'],
+      squad: r.squad_name || r.squad || '',
     })
   })
 
@@ -65,6 +66,7 @@ async function getAllBookings() {
         checkin:    f.checkin,
         checkout:   f.checkout,
         source:     'feedback',
+        squad:      f.squad || f.squad_name || '',
         rating:     f.primary_rating,
         comment:    f.comment,
         platform:   f.posted_on,

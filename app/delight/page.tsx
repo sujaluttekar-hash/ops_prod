@@ -455,6 +455,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
               booking_id: b.booking_id,
               villa_name: b.villa_name || p.villa_name,
               booking_date: b.checkin || p.booking_date,
+              squad: b.squad || p.squad,
             }))}
           />
         </div>
