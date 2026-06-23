@@ -500,13 +500,22 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
           <BookingSearch
             value={form.booking_id}
             onChange={v => setForm(p => ({ ...p, booking_id: v }))}
-            onSelect={b => setForm(p => ({
-              ...p,
-              booking_id: b.booking_id,
-              villa_name: b.villa_name || p.villa_name,
-              booking_date: b.checkin || p.booking_date,
-              squad: b.squad || p.squad,
-            }))}
+            onSelect={b => {
+              // Derive squad from villa name using our PROPERTIES list (most accurate)
+              const matchedProp = PROPERTIES.find((pr: any) =>
+                pr.name.toLowerCase() === (b.villa_name || '').toLowerCase() ||
+                (b.villa_name || '').toLowerCase().includes(pr.name.toLowerCase()) ||
+                pr.name.toLowerCase().includes((b.villa_name || '').toLowerCase())
+              );
+              const derivedSquad = (matchedProp as any)?.squad || b.squad || '';
+              setForm(p => ({
+                ...p,
+                booking_id: b.booking_id,
+                villa_name: b.villa_name || p.villa_name,
+                booking_date: b.checkin || p.booking_date,
+                squad: derivedSquad || p.squad,
+              }));
+            }}
           />
         </div>
         <BookingInsight bookingId={form.booking_id} />
