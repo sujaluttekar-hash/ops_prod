@@ -356,6 +356,21 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
               )}
             </div>
 
+            {/* Video upload — only for tasks that support it */}
+            {matrix.video && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Video (optional · max 100MB)</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button type="button" onClick={() => videoRef.current?.click()}
+                    style={{ flex: 1, padding: '10px 0', background: video ? 'rgba(151,196,89,0.1)' : 'var(--muted)', border: `1px solid ${video ? '#97C459' : 'rgba(0,0,0,0.1)'}`, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: video ? '#2D5A0E' : 'var(--sv-dark)' }}>
+                    🎥 {video ? '✅ ' + video.name.slice(0,20) + (video.name.length > 20 ? '…' : '') : 'Upload video'}
+                  </button>
+                  {video && <button type="button" onClick={() => setVideo(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9CA3AF' }}>✕</button>}
+                </div>
+                {video && <div style={{ fontSize: 10, color: '#2D5A0E', marginTop: 3 }}>{(video.file.size/1024/1024).toFixed(1)}MB · ready to upload</div>}
+              </div>
+            )}
+
             {/* Notes */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Notes (optional)</div>

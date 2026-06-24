@@ -172,6 +172,7 @@ function BookingSearch({ value, onChange, onSelect }: {
       <div style={{ position: 'relative' }}>
         <input className="sv-input" style={{ width: '100%', paddingRight: 32 }}
           placeholder="Search by booking ID or guest name…"
+          inputMode="search"
           value={query}
           onChange={e => handleChange(e.target.value)}
           onFocus={() => query.length >= 2 && setOpen(true)}

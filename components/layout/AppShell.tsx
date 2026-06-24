@@ -186,8 +186,21 @@ function SidebarContent({ user, nav, isActive, roleLabel, onNavClick }: any) {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0);
   useButlerLocation(user?.role === 'butler' ? user as any : null); // ONLY butlers
+
+  // Fetch unread notification count for topbar badge
+  useEffect(() => {
+    if (!user?.id) return
+    const fetchCount = () => getServiceSupabase()
+      .from('notifications').select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id).eq('read', false)
+      .then(({ count }: any) => setUnreadCount(count || 0))
+    fetchCount()
+    const t = setInterval(fetchCount, 30000)
+    return () => clearInterval(t)
+  }, [user?.id])
   const isLoginPage = pathname === '/login';
 
   useEffect(() => {
@@ -218,10 +231,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div style={{ width: 28, height: 28, borderRadius: 7, background: 'linear-gradient(135deg, #9CCCFC, #E9A0A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>S</div>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 1 }}>STAYVISTA</span>
         </div>
-        <button onClick={() => setMobileOpen(!mobileOpen)}
-          style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {mobileOpen ? '✕' : '☰'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {unreadCount > 0 && !mobileOpen && (
+            <div style={{ background: '#E9A0A7', color: '#fff', borderRadius: 20, padding: '3px 9px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+              🔔 {unreadCount > 9 ? '9+' : unreadCount}
+            </div>
+          )}
+          <button onClick={() => setMobileOpen(!mobileOpen)}
+            style={{ background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {mobileOpen ? '✕' : '☰'}
+          </button>
+        </div>
       </div>
 
       {/* ── Mobile drawer overlay ── */}
