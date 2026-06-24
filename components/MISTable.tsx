@@ -49,14 +49,19 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
   const [redashData, setRedashData] = useState<Record<string,any>>({})
   const [loading, setLoading] = useState(false)
   const defaultStart = `${year}-${String(month+1).padStart(2,'0')}-01`
-  const defaultEnd   = new Date(year, month+1, 0).toISOString().slice(0,10)
+  // Default end = today (not end of month)
+  const todayStr = new Date().toISOString().slice(0,10)
+  const defaultEnd = todayStr
   const [dateFrom, setDateFrom] = useState(defaultStart)
   const [dateTo,   setDateTo]   = useState(defaultEnd)
 
-  // Sync when month/year changes
+  // Sync when month/year changes — end stays today unless month is in past
   useEffect(() => {
-    setDateFrom(`${year}-${String(month+1).padStart(2,'0')}-01`)
-    setDateTo(new Date(year, month+1, 0).toISOString().slice(0,10))
+    const newStart = `${year}-${String(month+1).padStart(2,'0')}-01`
+    const monthEnd = new Date(year, month+1, 0).toISOString().slice(0,10)
+    const newEnd = monthEnd < todayStr ? monthEnd : todayStr
+    setDateFrom(newStart)
+    setDateTo(newEnd)
   }, [month, year])
 
   const start = dateFrom
@@ -166,7 +171,7 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               style={{ fontSize: 11, padding: '5px 8px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer' }} />
           </div>
-          <button onClick={() => { setDateFrom(defaultStart); setDateTo(defaultEnd); }}
+          <button onClick={() => { setDateFrom(defaultStart); setDateTo(todayStr); }}
             style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer', color: 'var(--muted-fg)' }}>
             Reset to month
           </button>
