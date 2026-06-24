@@ -205,17 +205,26 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
         photo_url = await uploadTaskPhoto(photo.file, task.id);
       }
 
-      // Upload video in background if provided
+      // Upload video if provided
       let video_url: string | null = null;
       if (video) {
         try {
-          const vPath = `tasks/video_${task.id}_${Date.now()}.${video.file.name.split('.').pop()}`;
-          const { data: vUp } = await getServiceSupabase().storage.from('delight-photos').upload(vPath, video.file, { upsert: true });
-          if (vUp) {
+          const ext = video.file.name.split('.').pop()?.toLowerCase() || 'mp4';
+          const contentType = ext === 'mov' ? 'video/quicktime' : ext === 'avi' ? 'video/avi' : 'video/mp4';
+          const vPath = `tasks/video_${task.id}_${Date.now()}.${ext}`;
+          const { data: vUp, error: vErr } = await getServiceSupabase().storage
+            .from('delight-photos')
+            .upload(vPath, video.file, { upsert: true, contentType });
+          if (vUp && !vErr) {
             const { data: { publicUrl } } = getServiceSupabase().storage.from('delight-photos').getPublicUrl(vUp.path);
             video_url = publicUrl;
+          } else if (vErr) {
+            console.error('Video upload error:', vErr.message);
           }
-        } catch {}
+        } catch (e: any) {
+          console.error('Video upload failed:', e.message);
+          // Don't block task completion for video upload failure
+        }
       }
 
       // Build notes with booking ID and comment

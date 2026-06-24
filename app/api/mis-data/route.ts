@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const REG_URL  = 'https://redash.vistarooms.com/api/queries/847/results.csv?api_key=wB001NJMVA6OphBjPx39ktwoiihkiKwsksYF4eQC'
 const FEED_URL = 'https://redash.vistarooms.com/api/queries/849/results.csv?api_key=im0PtIJYIygAazC7CyDNdkMCRxd2c9fxrRavG9v7'
+const SURL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
+const SVC  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
 
 let cache: { reg: any[]; feed: any[]; ts: number } | null = null
 const TTL = 5 * 60 * 1000
@@ -24,113 +27,137 @@ function parseCSV(csv: string): Record<string,string>[] {
   })
 }
 
-// Parse DD-Mon-YYYY → Date
 function parseDate(s: string): Date | null {
   if (!s || s === 'NA') return null
   const months: Record<string,number> = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11}
   const parts = s.split('-')
   if (parts.length !== 3) return null
-  const [d, mon, y] = parts
-  const month = months[mon]
+  const month = months[parts[1]]
   if (month === undefined) return null
-  return new Date(parseInt(y), month, parseInt(d))
+  return new Date(parseInt(parts[2]), month, parseInt(parts[0]))
 }
 
-async function getData() {
+async function getRedashData() {
   if (cache && Date.now() - cache.ts < TTL) return cache
   const [rr, fr] = await Promise.all([fetch(REG_URL), fetch(FEED_URL)])
   const [rc, fc] = await Promise.all([rr.text(), fr.text()])
-  const reg = parseCSV(rc)
-  const feed = parseCSV(fc)
-  cache = { reg, feed, ts: Date.now() }
+  cache = { reg: parseCSV(rc), feed: parseCSV(fc), ts: Date.now() }
   return cache
 }
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const month = parseInt(searchParams.get('month') || '0') // 0-based
-  const year  = parseInt(searchParams.get('year')  || String(new Date().getFullYear()))
-  // Butler names from app
-  const butlerNames = (searchParams.get('butlers') || '').split(',').filter(Boolean)
+  const month = parseInt(searchParams.get('month') || '0')
+  const year  = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
+  const startDate = new Date(year, month, 1)
+  const endDate   = new Date(year, month+1, 0)
+
+  const startStr = `${year}-${String(month+1).padStart(2,'0')}-01`
+  const endStr   = endDate.toISOString().slice(0,10)
 
   try {
-    const { reg, feed } = await getData()
+    // 1. Get all butlers
+    const sb = createClient(SURL, SVC)
+    const { data: butlers } = await sb.from('profiles').select('id,name,squad').eq('role','butler').eq('is_active',true).order('name')
+    if (!butlers?.length) return NextResponse.json({ results: {} })
 
-    // Date range
-    const startDate = new Date(year, month, 1)
-    const endDate   = new Date(year, month+1, 0) // last day
+    // 2. Get delights with booking IDs for this month — this links butler → booking
+    const { data: delights } = await sb.from('guest_delights')
+      .select('your_name,booking_id,status')
+      .gte('created_at', `${startStr}T00:00:00`)
+      .lte('created_at', `${endStr}T23:59:59`)
 
-    function inRange(row: any) {
-      const d = parseDate(row.checkin || row.checkout)
-      if (!d) return false
-      return d >= startDate && d <= endDate
-    }
+    // 3. Get allocation tasks for utilisation
+    const { data: allocTasks } = await sb.from('tasks')
+      .select('type,butler_id,notes,created_at')
+      .in('type', ['Check-In','Check-Out','Booking','Non Booking'])
 
-    // Filter rows for this month
-    const regMonth  = reg.filter(inRange)
-    const feedMonth = feed.filter(inRange)
+    // 4. Get feedback tasks (7-star from tasks)
+    const { data: feedbackTasks } = await sb.from('tasks')
+      .select('type,butler_id,notes,status,created_at')
+      .eq('type', 'Guest welcome')
 
-    // Build per-butler metrics
+    // 5. Get Redash data
+    const { reg: regRows, feed: feedRows } = await getRedashData()
+
+    // Index Redash by booking_id for O(1) lookup
+    const regByBookingId = new Map(regRows.map(r => [r.booking_id, r]))
+    const feedByBookingId = new Map(feedRows.map(f => [f.booking_id, f]))
+
     const results: Record<string, any> = {}
 
-    for (const name of butlerNames) {
-      const nameLower = name.toLowerCase().trim()
+    for (const b of butlers) {
+      const bName = b.name
+      const bId = b.id
 
-      // Registration rows for this butler
-      // Match by Sem_Name (SEM is the butler equivalent in registration data)
-      const butlerRegRows = regMonth.filter(r =>
-        (r.Sem_Name||r.sem_name||'').toLowerCase().trim() === nameLower ||
-        (r.squad_name||'').toLowerCase().trim() === nameLower
+      // ── Utilisation ──────────────────────────────────────────
+      // = unique booking IDs for this butler in date range + non-booking count
+      const bAllocTasks = (allocTasks || []).filter((t: any) => {
+        const dateFromNotes = (t.notes||'').match(/Date: (\d{4}-\d{2}-\d{2})/)?.[1]
+        const d = dateFromNotes || (t.created_at||'').slice(0,10)
+        if (d < startStr || d > endStr) return false
+        return t.butler_id === bId || (t.notes||'').includes(`Butler: ${bName}`)
+      })
+      const uniqueBookingTaskIds = new Set(
+        bAllocTasks
+          .filter((t: any) => t.type !== 'Non Booking')
+          .map((t: any) => (t.notes||'').match(/BookingID: (\S+)/)?.[1] || null)
+          .filter(Boolean)
       )
+      const nonBookingCount = bAllocTasks.filter((t: any) => t.type === 'Non Booking').length
+      const utilisation = uniqueBookingTaskIds.size + nonBookingCount
 
-      // Unique booking IDs (utilisation)
-      const uniqueBookingIds = new Set(butlerRegRows.map(r => r.booking_id).filter(Boolean))
-      // Non-booking tasks: we don't have this from Redash — it comes from app DB
-      // Will be merged with app data on frontend
-      const utilisation = uniqueBookingIds.size
-
-      // 7 star: % of bookings (by this butler's squad/sem) with primary_rating = "5"
-      const feedButler = feedMonth.filter(r =>
-        (r.sem_name||r.Sem_Name||'').toLowerCase().trim() === nameLower ||
-        butlerRegRows.some(br => br.booking_id === r.booking_id) // bookings handled by this butler
+      // ── Booking IDs from our delight table for this butler ───
+      const bDelights = (delights || []).filter((d: any) =>
+        (d.your_name||'').toLowerCase().trim() === bName.toLowerCase().trim() &&
+        d.booking_id
       )
-      const ratedBookings = feedButler.filter(r => r.primary_rating && r.primary_rating !== 'NA')
-      const fiveStarBookings = ratedBookings.filter(r => parseFloat(r.primary_rating) >= 4.5)
-      const sevenStarPct = ratedBookings.length > 0
-        ? Math.round(fiveStarBookings.length / ratedBookings.length * 100)
+      const bBookingIds = [...new Set(bDelights.map((d: any) => d.booking_id).filter(Boolean))]
+
+      // ── Guest Registration ───────────────────────────────────
+      // For each booking ID the butler logged, check if Guest Registration = "1"
+      const regForButler = bBookingIds.map(id => regByBookingId.get(id)).filter(Boolean)
+      const regDone = regForButler.filter((r: any) => r['Guest Registration'] === '1').length
+      const registrationPct = regForButler.length > 0
+        ? Math.round(regDone / regForButler.length * 100)
         : null
 
-      // OTA Review: bookings with primary_rating on OTA platforms / total non-NB bookings
-      const otaBookings = feedButler.filter(r =>
-        r.primary_source && !['vista','direct','offline','na'].some(s => (r.primary_source||'').toLowerCase().includes(s))
+      // ── 7 Star Reviews ───────────────────────────────────────
+      // Bookings with primary_rating = "5" / all rated bookings
+      const feedForButler = bBookingIds.map(id => feedByBookingId.get(id)).filter(Boolean)
+      const ratedBookings = feedForButler.filter((f: any) => f?.primary_rating && f.primary_rating !== 'NA' && f.primary_rating !== '')
+      const fiveStarCount = ratedBookings.filter((f: any) => parseFloat(f?.primary_rating) >= 4.5).length
+      const sevenStarPct = ratedBookings.length > 0
+        ? Math.round(fiveStarCount / ratedBookings.length * 100)
+        : null
+
+      // ── OTA Review ───────────────────────────────────────────
+      // Bookings on OTA platforms (not Vista/Direct) with rating / total OTA bookings
+      const OTA_SOURCES = ['airbnb','makemytrip','gommt','booking.com','expedia','tripadvisor','agoda']
+      const otaBookings = feedForButler.filter((f: any) =>
+        OTA_SOURCES.some(s => (f?.primary_source||'').toLowerCase().includes(s))
       )
-      const otaRated = otaBookings.filter(r => r.primary_rating && r.primary_rating !== 'NA' && parseFloat(r.primary_rating) >= 4.5)
+      const otaRated = otaBookings.filter((f: any) => f?.primary_rating && f.primary_rating !== 'NA' && parseFloat(f.primary_rating) >= 4.5)
       const otaPct = otaBookings.length > 0
         ? Math.round(otaRated.length / otaBookings.length * 100)
         : null
 
-      // Guest Registration: Guest Registration = "1" / total bookings for this butler
-      const totalBookings = butlerRegRows.length
-      const registeredBookings = butlerRegRows.filter(r => r['Guest Registration'] === '1').length
-      const registrationPct = totalBookings > 0
-        ? Math.round(registeredBookings / totalBookings * 100)
-        : null
-
-      results[name] = {
-        utilisation_from_redash: utilisation,
+      results[bName] = {
+        utilisation: utilisation > 0 ? utilisation : null,
         seven_star_pct: sevenStarPct,
         ota_pct: otaPct,
         registration_pct: registrationPct,
-        registration_total: totalBookings,
-        registration_done: registeredBookings,
-        rated_bookings: ratedBookings.length,
-        five_star: fiveStarBookings.length,
-        ota_total: otaBookings.length,
-        ota_five_star: otaRated.length,
+        debug: {
+          booking_ids_in_app: bBookingIds.length,
+          reg_matched: regForButler.length,
+          feed_matched: feedForButler.length,
+          rated: ratedBookings.length,
+          five_star: fiveStarCount,
+        }
       }
     }
 
-    return NextResponse.json({ results, month, year })
+    return NextResponse.json({ results, month, year, generated_at: new Date().toISOString() })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

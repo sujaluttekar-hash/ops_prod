@@ -48,16 +48,25 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
 }) {
   const [redashData, setRedashData] = useState<Record<string,any>>({})
   const [loading, setLoading] = useState(false)
+  const defaultStart = `${year}-${String(month+1).padStart(2,'0')}-01`
+  const defaultEnd   = new Date(year, month+1, 0).toISOString().slice(0,10)
+  const [dateFrom, setDateFrom] = useState(defaultStart)
+  const [dateTo,   setDateTo]   = useState(defaultEnd)
 
-  const start = `${year}-${String(month+1).padStart(2,'0')}-01`
-  const end   = new Date(year, month+1, 0).toISOString().slice(0,10)
+  // Sync when month/year changes
+  useEffect(() => {
+    setDateFrom(`${year}-${String(month+1).padStart(2,'0')}-01`)
+    setDateTo(new Date(year, month+1, 0).toISOString().slice(0,10))
+  }, [month, year])
 
-  // Fetch Redash MIS data for all butlers
+  const start = dateFrom
+  const end   = dateTo
+
+  // Fetch Redash MIS data
   useEffect(() => {
     if (!butlers.length) return
     setLoading(true)
-    const names = butlers.map((b: any) => b.name).join(',')
-    fetch(`/api/mis-data?month=${month}&year=${year}&butlers=${encodeURIComponent(names)}`)
+    fetch(`/api/mis-data?month=${month}&year=${year}`)
       .then(r => r.json())
       .then(d => { setRedashData(d.results || {}); setLoading(false) })
       .catch(() => setLoading(false))
@@ -137,17 +146,36 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
 
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--sv-dark)' }}>MIS Performance Table</div>
-          <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 1 }}>
-            {MONTHS[month]} {year} · {butlers.length} butlers
-            {loading && <span style={{ marginLeft: 8, color: '#9CCCFC' }}>⟳ Loading Redash data…</span>}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--sv-dark)' }}>MIS Performance Table</div>
+            <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginTop: 1 }}>
+              {dateFrom} → {dateTo} · {butlers.length} butlers
+              {loading && <span style={{ marginLeft: 8, color: '#9CCCFC' }}>⟳ Loading…</span>}
+            </div>
           </div>
+          <a href="/performance" style={{ textDecoration: 'none' }}>
+            <button className="sv-btn" style={{ fontSize: 12 }}>Full report →</button>
+          </a>
         </div>
-        <a href="/performance" style={{ textDecoration: 'none' }}>
-          <button className="sv-btn" style={{ fontSize: 12 }}>Full report →</button>
-        </a>
+        {/* Date range pickers */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 11, color: 'var(--muted-fg)', fontWeight: 600 }}>From</span>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              style={{ fontSize: 11, padding: '5px 8px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 11, color: 'var(--muted-fg)', fontWeight: 600 }}>To</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              style={{ fontSize: 11, padding: '5px 8px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer' }} />
+          </div>
+          <button onClick={() => { setDateFrom(defaultStart); setDateTo(defaultEnd); }}
+            style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer', color: 'var(--muted-fg)' }}>
+            Reset to month
+          </button>
+        </div>
       </div>
 
       <div style={{ overflowX: 'auto', borderRadius: 14, border: '1px solid #E5E7EB', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
