@@ -7,6 +7,19 @@ import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { isSupervisor } from '@/lib/auth';
 
+
+// ── Task field matrix ─────────────────────────────────────────
+const BOOKING_REQUIRED_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Check-In','Check-Out','Booking'];
+const TASK_FIELD_MATRIX: Record<string, { bookingId: boolean; arrivalSelfie: boolean; exitSelfie: boolean; guestWelcome: boolean; comment: boolean; video: boolean }> = {
+  'Arrival selfie':  { bookingId: true,  arrivalSelfie: true,  exitSelfie: false, guestWelcome: false, comment: false, video: true  },
+  'Guest welcome':   { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: true,  comment: false, video: true  },
+  'Table layout':    { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: false, video: false },
+  'Exit selfie':     { bookingId: true,  arrivalSelfie: false, exitSelfie: true,  guestWelcome: false, comment: false, video: true  },
+  'Check-In':        { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: true,  comment: false, video: false },
+  'Check-Out':       { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: false, video: false },
+  'Non Booking':     { bookingId: false, arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: true,  video: false },
+};
+
 const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Custom task'];
 const taskEmoji: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋','Custom task':'✏️' };
 
@@ -43,7 +56,20 @@ function AssignTaskModal({ onClose, onDone }: { onClose: () => void; onDone: () 
     onDone(); onClose();
   }
 
-  const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Custom task'];
+  
+// ── Task field matrix ─────────────────────────────────────────
+const BOOKING_REQUIRED_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Check-In','Check-Out','Booking'];
+const TASK_FIELD_MATRIX: Record<string, { bookingId: boolean; arrivalSelfie: boolean; exitSelfie: boolean; guestWelcome: boolean; comment: boolean; video: boolean }> = {
+  'Arrival selfie':  { bookingId: true,  arrivalSelfie: true,  exitSelfie: false, guestWelcome: false, comment: false, video: true  },
+  'Guest welcome':   { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: true,  comment: false, video: true  },
+  'Table layout':    { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: false, video: false },
+  'Exit selfie':     { bookingId: true,  arrivalSelfie: false, exitSelfie: true,  guestWelcome: false, comment: false, video: true  },
+  'Check-In':        { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: true,  comment: false, video: false },
+  'Check-Out':       { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: false, video: false },
+  'Non Booking':     { bookingId: false, arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: true,  video: false },
+};
+
+const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Custom task'];
   const TASK_EMOJIS: Record<string,string> = { 'Arrival selfie':'🤳','Guest welcome':'🙏','Table layout':'🍽','Exit selfie':'👋','Custom task':'✏️' };
 
   return (
@@ -138,9 +164,17 @@ function useVoiceRecorder() {
 function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () => void; onDone: (taskId: string) => void }) {
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null);
+  const [video, setVideo] = useState<{ file: File; name: string } | null>(null);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [bookingId, setBookingId] = useState('');
+  const [taskComment, setTaskComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const videoRef = useRef<HTMLInputElement>(null);
+  const matrix = TASK_FIELD_MATRIX[task.type] || { bookingId: false, arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: false, video: false };
+  const needsBookingId = matrix.bookingId;
+  const needsComment = matrix.comment;
   const voice = useVoiceRecorder();
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -153,8 +187,17 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
   }
 
   async function handleSubmit() {
-    setSaving(true);
     setSubmitError('');
+    // Validate required fields
+    if (needsBookingId && !bookingId.trim()) {
+      setSubmitError('Booking ID is required for this task type.');
+      return;
+    }
+    if (needsComment && !taskComment.trim()) {
+      setSubmitError('Please describe what task was performed.');
+      return;
+    }
+    setSaving(true);
     try {
       // Upload photo first (if any)
       let photo_url: string | null = null;
@@ -162,12 +205,35 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
         photo_url = await uploadTaskPhoto(photo.file, task.id);
       }
 
+      // Upload video in background if provided
+      let video_url: string | null = null;
+      if (video) {
+        try {
+          const vPath = `tasks/video_${task.id}_${Date.now()}.${video.file.name.split('.').pop()}`;
+          const { data: vUp } = await getServiceSupabase().storage.from('delight-photos').upload(vPath, video.file, { upsert: true });
+          if (vUp) {
+            const { data: { publicUrl } } = getServiceSupabase().storage.from('delight-photos').getPublicUrl(vUp.path);
+            video_url = publicUrl;
+          }
+        } catch {}
+      }
+
+      // Build notes with booking ID and comment
+      const noteParts = [
+        task.notes || '',
+        bookingId ? `BookingID: ${bookingId}` : '',
+        taskComment ? `Comment: ${taskComment}` : '',
+        isCustom && customTaskName ? `Task: ${customTaskName}` : '',
+        notes || '',
+      ].filter(Boolean);
+
       // Save task as completed — GPS runs after, non-blocking
       const { error } = await getServiceSupabase().from('tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        notes: [isCustom && customTaskName ? `Task: ${customTaskName}` : '', notes || task.notes || ''].filter(Boolean).join(' · ') || null,
+        notes: noteParts.join(' · ') || null,
         photo_path: photo_url || task.photo_path || null,
+        voice_url: video_url || undefined,
       }).eq('id', task.id);
 
       if (error) {

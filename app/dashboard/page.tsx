@@ -5,6 +5,7 @@ import { getServiceSupabase, LOCAL_PROFILES } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { useButlerLocation } from '@/lib/use-butler-location'
 import { isSupervisor } from '@/lib/auth'
+import MISTable from '@/components/MISTable'
 
 function BarChart({ data, color, label }: { data: { name: string; value: number }[]; color: string; label: string }) {
   const max = Math.max(...data.map(d => d.value), 1)
@@ -203,6 +204,10 @@ export default function DashboardPage() {
   const [allTrainings, setAllTrainings] = useState<any[]>([])
   const [butlers, setButlers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [allAttendance, setAllAttendance] = useState<any[]>([])
+  const [allPhotos, setAllPhotos] = useState<any[]>([])
+  const [misData, setMisData] = useState<any[]>([])
+  const [misLoading, setMisLoading] = useState(false)
 
   // Filters
   const now = new Date()
@@ -218,21 +223,36 @@ export default function DashboardPage() {
     setLoading(true)
     const sb = getServiceSupabase()
     try {
-      const [tR, dR, hR, pR, trR] = await Promise.all([
+      const [tR, dR, hR, pR, trR, attR, photoR] = await Promise.all([
         sb.from('tasks').select('id,type,status,butler_id,notes,completed_at,created_at').order('created_at', { ascending: false }),
-        sb.from('guest_delights').select('id,your_name,villa_name,booking_type,booking_date,status,created_at').order('created_at', { ascending: false }),
+        sb.from('guest_delights').select('id,your_name,villa_name,booking_type,booking_date,status,created_at,booking_id').order('created_at', { ascending: false }),
         sb.from('huddles').select('id,team,huddle_date,status').order('huddle_date', { ascending: false }),
         sb.from('profiles').select('id,name,squad,role').eq('is_active', true),
         sb.from('trainings').select('id,type,date,status').order('date', { ascending: false }),
+        sb.from('attendance').select('butler_id,status,date'),
+        sb.from('delight_photos').select('id,delight_id,photo_status'),
       ])
       setAllTasks(tR.data || [])
       setAllDelights(dR.data || [])
       setAllHuddles(hR.data || [])
       setAllTrainings(trR.data || [])
       setButlers((pR.data || []).filter((p: any) => p.role === 'butler'))
+      setAllAttendance(attR.data || [])
+      setAllPhotos(photoR.data || [])
     } catch (e) { console.error(e) }
     setLoading(false)
   }
+
+  // MIS: batch fetch from Redash for guest registration data
+  useEffect(() => {
+    if (!isSuper) return
+    setMisLoading(true)
+    fetch('/api/redash-registration')
+      .then(r => r.json())
+      .then(d => { setMisData(d.rows || []) })
+      .catch(() => {})
+      .finally(() => setMisLoading(false))
+  }, [isSuper])
 
   // Helpers
   function butlerNameFromTask(t: any) {
@@ -511,6 +531,21 @@ export default function DashboardPage() {
         </div>
 
         {/* Butler quick actions */}
+        {/* ── MIS Performance Table — Admin only ── */}
+        {isSuper && (
+          <MISTable
+            butlers={butlers}
+            allTasks={allTasks}
+            allDelights={allDelights}
+            allAttendance={allAttendance}
+            allPhotos={allPhotos}
+            misData={misData}
+            misLoading={misLoading}
+            month={selMonth}
+            year={selYear}
+          />
+        )}
+
         {!isSuper && (
           <div className="sv-card" style={{ marginTop: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Quick actions</div>
