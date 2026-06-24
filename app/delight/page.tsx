@@ -650,11 +650,18 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
               </button>
             )
           )}
+          {/* Admin/supervisor: always see Edit with lock indicator */}
           {canAcknowledge && (canEdit ? (
             <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px' }} onClick={onEdit}>✏️ Edit</button>
           ) : (
             <span style={{ fontSize: 10, color: 'var(--muted-fg)', padding: '4px 8px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.08)' }}>🔒 {editLockedMsg}</span>
           ))}
+          {/* Butler: show Edit if there are declined photos that need retaking */}
+          {!canAcknowledge && photos.some((p: any) => p.photo_status === 'declined') && (
+            <button className="sv-btn" style={{ fontSize: 11, padding: '4px 10px', borderColor: '#E9A0A7', color: '#8B2020' }} onClick={onEdit}>
+              📸 Redo photos
+            </button>
+          )}
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setExpanded(v => !v)}>
             {expanded ? '▲' : `📷 ${photos.length}`}
           </button>
