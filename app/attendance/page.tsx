@@ -52,6 +52,7 @@ export default function AttendancePage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [squad, setSquad] = useState('All');
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState('');
   const isSuper = user ? isSupervisor(user.role as any) : false;
 
   async function load() {
@@ -99,11 +100,13 @@ export default function AttendancePage() {
       if (pos) { geo_lat = pos.lat; geo_lng = pos.lng; }
     }
 
-    await getServiceSupabase().from('attendance').upsert({
+    const sb2 = getServiceSupabase();
+    await sb2.from('attendance').delete().eq('date', date).eq('butler_id', butlerId);
+    await sb2.from('attendance').insert({
       date, butler_id: butlerId, status,
       check_in: status !== 'absent' ? now : null,
       geo_lat, geo_lng,
-    }, { onConflict: 'date,butler_id' });
+    });
 
     // Only push to map if butler marked themselves
     try {
@@ -122,6 +125,8 @@ export default function AttendancePage() {
 
     await load();
     setMarkingId(null);
+    setSaveMsg(status === 'absent' ? 'Marked absent' : `✅ Attendance marked — ${status}`);
+    setTimeout(() => setSaveMsg(''), 3000);
   }
 
   const present = records.filter(r => r.status === 'present').length;
@@ -143,6 +148,11 @@ export default function AttendancePage() {
         }
       />
       <div style={{ padding: 24 }} className="page-enter">
+        {saveMsg && (
+          <div style={{ background: 'rgba(151,196,89,0.12)', border: '1px solid #97C459', borderRadius: 10, padding: '10px 16px', marginBottom: 14, fontSize: 13, fontWeight: 600, color: '#2D5A0E' }}>
+            {saveMsg}
+          </div>
+        )}
         <div className="sv-strip" />
         <WeekCalendar currentDate={date} onSelectDate={setDate} />
         {isSuper && (

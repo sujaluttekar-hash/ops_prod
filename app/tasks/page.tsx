@@ -386,6 +386,30 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
   const [completeTask, setCompleteTask] = useState<any | null>(null);
+  const [rejectTask, setRejectTask] = useState<any | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+
+  async function handleReject() {
+    if (!rejectTask || !rejectReason.trim()) return;
+    setRejecting(true);
+    const stored = localStorage.getItem('sv_local_session');
+    const u = stored ? JSON.parse(stored) : {};
+    const note = (rejectTask.notes ? rejectTask.notes + ' · ' : '') +
+      `REJECTED by ${u.name || 'Admin'} · ${new Date().toLocaleString('en-IN')} · Reason: ${rejectReason}`;
+    await getServiceSupabase().from('tasks').update({ status: 'rejected', notes: note }).eq('id', rejectTask.id);
+    try {
+      await getServiceSupabase().from('notifications').insert({
+        user_id: rejectTask.butler_id,
+        title: '❌ Task rejected — action required',
+        body: `Your ${rejectTask.type} was rejected. Reason: ${rejectReason}`,
+        type: 'task', read: false,
+      });
+    } catch {}
+    setRejectTask(null); setRejectReason(''); setRejecting(false);
+    load();
+  }
+
   const [showAssign, setShowAssign] = useState(false);
   const [viewPhoto, setViewPhoto] = useState<any | null>(null);
 
@@ -489,6 +513,29 @@ export default function TasksPage() {
           </div>
         </div>
       )}
+      {/* Reject Modal */}
+      {rejectTask && (
+        <div onClick={() => setRejectTask(null)} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>❌ Reject task</div>
+            <div className="sv-strip" style={{ marginBottom: 14 }} />
+            <div style={{ fontSize: 13, color: 'var(--muted-fg)', marginBottom: 14 }}>Rejecting: <strong>{rejectTask.type}</strong> — butler notified immediately.</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', marginBottom: 6 }}>Reason <span style={{ color: '#E93C3C' }}>*</span></div>
+            <textarea className="sv-input" style={{ width: '100%', minHeight: 72, resize: 'vertical', marginBottom: 16 }}
+              placeholder="e.g. Photo quality too low, wrong location, please redo…"
+              value={rejectReason} onChange={e => setRejectReason(e.target.value)} autoFocus />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="sv-btn" style={{ flex: 1 }} onClick={() => setRejectTask(null)}>Cancel</button>
+              <button disabled={!rejectReason.trim() || rejecting}
+                style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: rejectReason.trim() ? '#E93C3C' : 'rgba(0,0,0,0.08)', color: rejectReason.trim() ? '#fff' : 'var(--muted-fg)', fontWeight: 700, fontSize: 13, cursor: rejectReason.trim() ? 'pointer' : 'not-allowed' }}
+                onClick={handleReject}>
+                {rejecting ? 'Rejecting…' : '✗ Reject & notify butler'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {completeTask && <CompleteTaskModal task={completeTask} onClose={() => setCompleteTask(null)} onDone={(taskId) => {
         // Immediately update local state so UI reflects completion
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'completed' as any } : t));
@@ -615,12 +662,15 @@ export default function TasksPage() {
                         <td><span className={getStatusBadge(t.status)}>{getStatusLabel(t.status)}</span></td>
                         <td>
                           {isPending ? (
-                            <button
-                              className="sv-btn sv-btn-primary"
-                              style={{ fontSize: 11, padding: '5px 12px' }}
-                              onClick={() => setCompleteTask(t)}>
-                              Complete task
-                            </button>
+                            <div style={{ display: 'flex', gap: 5 }}>
+                              <button className="sv-btn sv-btn-primary" style={{ fontSize: 11, padding: '5px 12px' }} onClick={() => setCompleteTask(t)}>
+                                Complete task
+                              </button>
+                              {isSuper && (
+                                <button className="sv-btn" style={{ fontSize: 11, padding: '5px 8px', color: '#8B2020', borderColor: '#E9A0A7' }}
+                                  onClick={() => { setRejectTask(t); setRejectReason(''); }}>✗ Reject</button>
+                              )}
+                            </div>
                           ) : t.status === 'completed' ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                               <span style={{ fontSize: 12, color: '#2D5A0E', fontWeight: 600 }}>✅ Done</span>
@@ -629,6 +679,17 @@ export default function TasksPage() {
                                 style={{ fontSize: 10, padding: '3px 8px', background: (t as any).photo_path ? 'rgba(151,196,89,0.15)' : 'rgba(0,0,0,0.05)', border: `1px solid ${(t as any).photo_path ? '#97C459' : 'rgba(0,0,0,0.1)'}`, borderRadius: 5, cursor: 'pointer', color: (t as any).photo_path ? '#2D5A0E' : 'var(--muted-fg)', fontWeight: 600 }}>
                                 {(t as any).photo_path ? '📷 View photo' : '📋 Details'}
                               </button>
+                            </div>
+                          ) : (t as any).status === 'rejected' ? (
+                            <div>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#8B2020', background: 'rgba(233,160,167,0.12)', padding: '3px 8px', borderRadius: 6 }}>❌ Rejected</span>
+                              {(t as any).notes?.includes('Reason:') && (
+                                <div style={{ fontSize: 10, color: '#8B2020', marginTop: 3 }}>{(t as any).notes.split('Reason: ')[1]?.slice(0,60)}</div>
+                              )}
+                              {!isSuper && (
+                                <button className="sv-btn" style={{ fontSize: 10, marginTop: 4, padding: '3px 8px' }}
+                                  onClick={() => setCompleteTask(t)}>↩ Resubmit</button>
+                              )}
                             </div>
                           ) : (
                             <span style={{ fontSize: 12, color: '#8B2020' }}>⚠ Delayed</span>
