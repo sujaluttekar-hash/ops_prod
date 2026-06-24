@@ -15,6 +15,7 @@ const navByRole: Record<string, NavSection> = {
     operations: [
       { label: 'Daily roster', href: '/allocation', icon: '📋' },
       { label: 'Guest delight', href: '/delight', icon: '🎁' },
+      { label: 'Photo gallery', href: '/gallery', icon: '📸' },
       { label: 'Tasks', href: '/tasks', icon: '✓' },
       { label: 'Cases', href: '/incidents', icon: '🆘' },
       { label: 'Attendance', href: '/attendance', icon: '📅' },
@@ -38,6 +39,7 @@ const navByRole: Record<string, NavSection> = {
     operations: [
       { label: 'Daily roster', href: '/allocation', icon: '📋' },
       { label: 'Guest delight', href: '/delight', icon: '🎁' },
+      { label: 'Photo gallery', href: '/gallery', icon: '📸' },
       { label: 'Tasks', href: '/tasks', icon: '✓' },
       { label: 'Cases', href: '/incidents', icon: '🆘' },
       { label: 'Attendance', href: '/attendance', icon: '📅' },
