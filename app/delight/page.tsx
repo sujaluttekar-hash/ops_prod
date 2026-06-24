@@ -740,7 +740,7 @@ export default function DelightPage() {
     const sb = getServiceSupabase();
     try {
       // Fetch delights and photos separately — join doesn't work without FK constraint
-      let delightQ = sb.from('guest_delights').select('*,admin_comment').order('created_at', { ascending: false });
+      let delightQ = sb.from('guest_delights').select('*').order('created_at', { ascending: false });
       if (!isSuper) delightQ = delightQ.eq('your_name', localUser.name || '');
       const { data: delights } = await delightQ;
 
