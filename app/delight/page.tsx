@@ -405,7 +405,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
   const uploadedCount = CATEGORIES.filter(cat => photos[cat.key] || existingPhotos[cat.key]).length;
 
   async function handleSave() {
-    if (!form.booking_id) { setError('Please search and select a Booking ID'); return; }
+    if (!form.booking_id && form.booking_type !== 'Non Booking Task') { setError('Booking ID is required for this task type'); return; }
     // villa_name is set either from VillaSearch selection or from booking auto-fill
     if (!form.villa_name) { setError('Villa is required — it auto-fills when you select a booking'); return; }
     if (!form.booking_date) { setError('Please set a booking date'); return; }
@@ -497,7 +497,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         </div>
 
         <div style={{ marginBottom: form.booking_id ? 8 : 12 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking ID *</div>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Booking ID {form.booking_type === 'Non Booking Task' ? '(optional)' : '*'}</div>
           <BookingSearch
             value={form.booking_id}
             onChange={v => setForm(p => ({ ...p, booking_id: v }))}
