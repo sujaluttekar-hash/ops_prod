@@ -445,6 +445,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
             pointer_key: cat.key,
             storage_path: path,
             public_url: publicUrl,
+            photo_status: 'pending',  // reset to pending so admin can re-review
           });
           if (insErr) {
             console.error('Photo save error:', insErr.message);
