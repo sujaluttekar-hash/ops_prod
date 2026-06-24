@@ -227,6 +227,9 @@ function RedashStatusBadges({ bookingId }: { bookingId: string }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookingData, setBookingData] = useState<Record<string,any>>({});
+  const [declineTarget, setDeclineTarget] = useState<{ photoId: string; entryId: string; catLabel: string; butlerName: string } | null>(null);
+  const [declineComment, setDeclineComment] = useState('');
+  const [declining, setDeclining] = useState(false);
   useEffect(() => {
     if (!bookingId) return;
     setLoading(true);
@@ -568,10 +571,13 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
 }
 
 // ── Entry card ────────────────────────────────────────────────
-function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoAction, canAcknowledge, currentUserId, bookingInfo }: { entry: any; onEdit: () => void; onAcknowledge: () => void; onUnacknowledge: () => void; onPhotoAction: (photoId: string, action: 'approved' | 'declined') => void; canAcknowledge: boolean; currentUserId: string; bookingInfo?: any }) {
+function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoAction, onDeclineRequest, canAcknowledge, currentUserId, bookingInfo }: { entry: any; onEdit: () => void; onAcknowledge: () => void; onUnacknowledge: () => void; onPhotoAction: (photoId: string, action: 'approved' | 'declined') => void; onDeclineRequest: (photoId: string, catLabel: string, butlerName: string, entryId: string) => void; canAcknowledge: boolean; currentUserId: string; bookingInfo?: any }) {
   const [expanded, setExpanded] = useState(false);
   const acks = entry.acknowledged_by || [];
   const hasAcked = acks.includes(currentUserId);
+  function onDecline(photoId: string, catLabel: string) {
+    onDeclineRequest(photoId, catLabel, entry.your_name, entry.id);
+  }
   const ackCount = acks.length;
   const isCompleted = entry.status === 'completed';
   const photos = entry.delight_photos || [];
@@ -685,7 +691,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
                         ) : (
                           <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
                             <button onClick={() => onPhotoAction(p.id, 'approved')} style={{ flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 4, border: 'none', background: 'rgba(151,196,89,0.15)', color: '#2D5A0E', cursor: 'pointer', fontWeight: 600 }}>✅ Ok</button>
-                            <button onClick={() => onPhotoAction(p.id, 'declined')} style={{ flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 4, border: 'none', background: 'rgba(233,160,167,0.12)', color: '#8B2020', cursor: 'pointer', fontWeight: 600 }}>❌ Redo</button>
+                            <button onClick={() => onDecline(p.id, cat.label)} style={{ flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 4, border: 'none', background: 'rgba(233,160,167,0.12)', color: '#8B2020', cursor: 'pointer', fontWeight: 600 }}>❌ Redo</button>
                           </div>
                         )}
                       </div>
@@ -696,6 +702,14 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
             })}
           </div>
 
+          {entry.admin_comment && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(233,160,167,0.08)', border: '1px solid #E9A0A7', borderRadius: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#8B2020', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>💬 Admin comments</div>
+              {entry.admin_comment.split('\n').map((line: string, i: number) => (
+                <div key={i} style={{ fontSize: 11, color: '#8B2020', lineHeight: 1.5 }}>{line}</div>
+              ))}
+            </div>
+          )}
           <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted-fg)' }}>
             {ackCount === 0 ? 'Not acknowledged yet — admin or supervisor can acknowledge' : '✅ Acknowledged'}
           </div>
@@ -711,6 +725,9 @@ export default function DelightPage() {
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingData, setBookingData] = useState<Record<string,any>>({});
+  const [declineTarget, setDeclineTarget] = useState<{ photoId: string; entryId: string; catLabel: string; butlerName: string } | null>(null);
+  const [declineComment, setDeclineComment] = useState('');
+  const [declining, setDeclining] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editEntry, setEditEntry] = useState<any | null>(null);
   const [tab, setTab] = useState<'all' | 'in_progress' | 'completed' | 'requests'>('all');
@@ -723,7 +740,7 @@ export default function DelightPage() {
     const sb = getServiceSupabase();
     try {
       // Fetch delights and photos separately — join doesn't work without FK constraint
-      let delightQ = sb.from('guest_delights').select('*').order('created_at', { ascending: false });
+      let delightQ = sb.from('guest_delights').select('*,admin_comment').order('created_at', { ascending: false });
       if (!isSuper) delightQ = delightQ.eq('your_name', localUser.name || '');
       const { data: delights } = await delightQ;
 
@@ -782,14 +799,45 @@ export default function DelightPage() {
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, acknowledged_by: [], status: 'pending' } : e));
   }
 
-  async function handlePhotoAction(photoId: string, action: 'approved' | 'declined') {
-    await getServiceSupabase().from('delight_photos').update({ photo_status: action }).eq('id', photoId);
-    // Update local state
+  async function handlePhotoAction(photoId: string, action: 'approved' | 'declined', comment?: string, entryId?: string, butlerName?: string) {
+    const sb = getServiceSupabase();
+    await sb.from('delight_photos').update({ photo_status: action }).eq('id', photoId);
+
+    // Notify butler if declined with comment
+    if (action === 'declined' && comment && entryId && butlerName) {
+      // Find butler's profile ID by name
+      try {
+        const { data: profiles } = await sb.from('profiles').select('id').eq('name', butlerName).single();
+        if (profiles?.id) {
+          const adminSession = (() => { try { return JSON.parse(localStorage.getItem('sv_local_session') || '{}'); } catch { return {}; } })();
+          await sb.from('notifications').insert({
+            user_id: profiles.id,
+            title: '📸 Photo declined — please redo',
+            body: `${adminSession.name || 'Admin'}: "${comment}" — please update your guest delight photos.`,
+            type: 'task',
+            read: false,
+          });
+        }
+      } catch {}
+      // Save comment on the delight entry
+      const entry = entries.find((e: any) => e.id === entryId);
+      if (entry) {
+        const adminSession = (() => { try { return JSON.parse(localStorage.getItem('sv_local_session') || '{}'); } catch { return {}; } })();
+        const existing = entry.admin_comment || '';
+        const newComment = `${adminSession.name || 'Admin'} (${new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}): ${comment}`;
+        await sb.from('guest_delights').update({
+          admin_comment: existing ? `${existing}
+${newComment}` : newComment,
+        }).eq('id', entryId);
+      }
+    }
+
     setEntries(prev => prev.map(e => ({
       ...e,
       delight_photos: (e.delight_photos || []).map((p: any) =>
         p.id === photoId ? { ...p, photo_status: action } : p
       ),
+      admin_comment: e.admin_comment,
     })));
   }
 
@@ -809,6 +857,35 @@ export default function DelightPage() {
 
   return (
     <>
+      {/* ── Decline with comment modal ── */}
+      {declineTarget && (
+        <div onClick={() => setDeclineTarget(null)} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>❌ Request redo — {declineTarget.catLabel}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted-fg)', marginBottom: 16 }}>Tell <strong>{declineTarget.butlerName}</strong> what needs to be fixed. They'll receive a notification.</div>
+            <div className="sv-strip" style={{ marginBottom: 16 }} />
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', marginBottom: 6 }}>Your comment <span style={{ color: '#E93C3C' }}>*</span></div>
+            <textarea className="sv-input" style={{ width: '100%', minHeight: 80, resize: 'vertical', marginBottom: 16 }}
+              placeholder="e.g. Photo is too dark, please retake in better lighting…"
+              value={declineComment} onChange={e => setDeclineComment(e.target.value)}
+              autoFocus />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="sv-btn" style={{ flex: 1 }} onClick={() => setDeclineTarget(null)}>Cancel</button>
+              <button disabled={!declineComment.trim() || declining}
+                onClick={async () => {
+                  if (!declineTarget || !declineComment.trim()) return;
+                  setDeclining(true);
+                  await handlePhotoAction(declineTarget.photoId, 'declined', declineComment, declineTarget.entryId, declineTarget.butlerName);
+                  setDeclineTarget(null); setDeclineComment(''); setDeclining(false);
+                }}
+                style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: declining || !declineComment.trim() ? 'rgba(0,0,0,0.08)' : '#E93C3C', color: declining || !declineComment.trim() ? 'var(--muted-fg)' : '#fff', fontWeight: 700, fontSize: 14, cursor: declineComment.trim() ? 'pointer' : 'not-allowed' }}>
+                {declining ? 'Sending…' : '❌ Decline & notify butler'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(showModal || editEntry) && (
         <LogModal
           editEntry={editEntry || undefined}
@@ -883,6 +960,10 @@ export default function DelightPage() {
                 onAcknowledge={() => handleAcknowledge(entry.id)}
                 onUnacknowledge={() => handleUnacknowledge(entry.id)}
                 onPhotoAction={handlePhotoAction}
+                onDeclineRequest={(photoId, catLabel, butlerName, entryId) => {
+                  setDeclineTarget({ photoId, catLabel, butlerName, entryId });
+                  setDeclineComment('');
+                }}
                 canAcknowledge={isSuper}
                 currentUserId={localUser.id || ''}
                 bookingInfo={bookingData[entry.booking_id] || null}
