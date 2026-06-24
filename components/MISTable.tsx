@@ -66,11 +66,11 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
   useEffect(() => {
     if (!butlers.length) return
     setLoading(true)
-    fetch(`/api/mis-data?month=${month}&year=${year}`)
+    fetch(`/api/mis-data?month=${month}&year=${year}&dateFrom=${dateFrom}&dateTo=${dateTo}`)
       .then(r => r.json())
       .then(d => { setRedashData(d.results || {}); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [butlers, month, year])
+  }, [butlers, month, year, dateFrom, dateTo])
 
   const photosByDelight = useMemo(() => {
     const m: Record<string, any[]> = {}

@@ -49,11 +49,13 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const month = parseInt(searchParams.get('month') || '0')
   const year  = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
-  const startDate = new Date(year, month, 1)
-  const endDate   = new Date(year, month+1, 0)
-
-  const startStr = `${year}-${String(month+1).padStart(2,'0')}-01`
-  const endStr   = endDate.toISOString().slice(0,10)
+  // Support custom date range from MIS table date pickers
+  const dateFromParam = searchParams.get('dateFrom')
+  const dateToParam   = searchParams.get('dateTo')
+  const startStr = dateFromParam || `${year}-${String(month+1).padStart(2,'0')}-01`
+  const endStr   = dateToParam   || new Date(year, month+1, 0).toISOString().slice(0,10)
+  const startDate = new Date(startStr + 'T00:00:00')
+  const endDate   = new Date(endStr   + 'T23:59:59')
 
   try {
     // 1. Get all butlers
@@ -118,10 +120,10 @@ export async function GET(req: Request) {
       // Primary: match by booking_id butler logged in delight table
       let regForButler = bBookingIds.map(id => regByBookingId.get(id)).filter(Boolean)
       
-      // Fallback: if no booking IDs logged yet, match by squad_name
-      if (regForButler.length === 0 && b.squad) {
+      // Fallback: only if date range is >= 7 days (avoid showing squad data for single-day filter)
+      const rangeDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      if (regForButler.length === 0 && b.squad && rangeDays >= 7) {
         const squadLower = b.squad.toLowerCase()
-        // Filter regRows for this month by squad
         regForButler = regRows.filter((r: any) => {
           const d = parseDate(r.checkin)
           if (!d || d < startDate || d > endDate) return false
@@ -138,7 +140,7 @@ export async function GET(req: Request) {
       // ── 7 Star Reviews ───────────────────────────────────────
       // Primary: by booking_id; Fallback: by squad
       let feedForButler = bBookingIds.map(id => feedByBookingId.get(id)).filter(Boolean)
-      if (feedForButler.length === 0 && b.squad) {
+      if (feedForButler.length === 0 && b.squad && rangeDays >= 7) {
         const squadLower = b.squad.toLowerCase()
         feedForButler = feedRows.filter((r: any) => {
           const d = parseDate(r.checkin)
