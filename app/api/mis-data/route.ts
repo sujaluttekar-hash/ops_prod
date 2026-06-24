@@ -115,16 +115,38 @@ export async function GET(req: Request) {
       const bBookingIds = [...new Set(bDelights.map((d: any) => d.booking_id).filter(Boolean))]
 
       // ── Guest Registration ───────────────────────────────────
-      // For each booking ID the butler logged, check if Guest Registration = "1"
-      const regForButler = bBookingIds.map(id => regByBookingId.get(id)).filter(Boolean)
+      // Primary: match by booking_id butler logged in delight table
+      let regForButler = bBookingIds.map(id => regByBookingId.get(id)).filter(Boolean)
+      
+      // Fallback: if no booking IDs logged yet, match by squad_name
+      if (regForButler.length === 0 && b.squad) {
+        const squadLower = b.squad.toLowerCase()
+        // Filter regRows for this month by squad
+        regForButler = regRows.filter((r: any) => {
+          const d = parseDate(r.checkin)
+          if (!d || d < startDate || d > endDate) return false
+          return (r.squad_name||'').toLowerCase().includes(squadLower) ||
+                 squadLower.includes((r.squad_name||'').toLowerCase())
+        })
+      }
+      
       const regDone = regForButler.filter((r: any) => r['Guest Registration'] === '1').length
       const registrationPct = regForButler.length > 0
         ? Math.round(regDone / regForButler.length * 100)
         : null
 
       // ── 7 Star Reviews ───────────────────────────────────────
-      // Bookings with primary_rating = "5" / all rated bookings
-      const feedForButler = bBookingIds.map(id => feedByBookingId.get(id)).filter(Boolean)
+      // Primary: by booking_id; Fallback: by squad
+      let feedForButler = bBookingIds.map(id => feedByBookingId.get(id)).filter(Boolean)
+      if (feedForButler.length === 0 && b.squad) {
+        const squadLower = b.squad.toLowerCase()
+        feedForButler = feedRows.filter((r: any) => {
+          const d = parseDate(r.checkin)
+          if (!d || d < startDate || d > endDate) return false
+          return (r.squad||r.squad_name||'').toLowerCase().includes(squadLower) ||
+                 squadLower.includes((r.squad||r.squad_name||'').toLowerCase())
+        })
+      }
       const ratedBookings = feedForButler.filter((f: any) => f?.primary_rating && f.primary_rating !== 'NA' && f.primary_rating !== '')
       const fiveStarCount = ratedBookings.filter((f: any) => parseFloat(f?.primary_rating) >= 4.5).length
       const sevenStarPct = ratedBookings.length > 0
