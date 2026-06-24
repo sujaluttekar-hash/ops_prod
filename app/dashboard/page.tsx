@@ -539,8 +539,6 @@ export default function DashboardPage() {
             allDelights={allDelights}
             allAttendance={allAttendance}
             allPhotos={allPhotos}
-            misData={misData}
-            misLoading={misLoading}
             month={selMonth}
             year={selYear}
           />
