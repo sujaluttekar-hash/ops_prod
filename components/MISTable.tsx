@@ -66,6 +66,7 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
   useEffect(() => {
     if (!butlers.length) return
     setLoading(true)
+    setRedashData({})  // clear stale data immediately
     fetch(`/api/mis-data?month=${month}&year=${year}&dateFrom=${dateFrom}&dateTo=${dateTo}`)
       .then(r => r.json())
       .then(d => { setRedashData(d.results || {}); setLoading(false) })
@@ -95,16 +96,10 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
         if (d < start || d > end) return false
         return t.butler_id === b.id || (t.notes||'').includes(`Butler: ${bName}`)
       })
-      // Unique booking IDs (non-null) + non-booking count
-      const bookingIds = new Set(allocTasks
-        .filter((t: any) => t.type !== 'Non Booking')
-        .map((t: any) => { const m = (t.notes||'').match(/BookingID: (\S+)/); return m?.[1] || null })
-        .filter(Boolean)
-      )
-      const nonBookingCount = allocTasks.filter((t: any) => t.type === 'Non Booking').length
-      const utilisation = bookingIds.size + nonBookingCount
-      // Use Redash utilisation if app has no data
-      const utilisationFinal = utilisation > 0 ? utilisation : (rd.utilisation_from_redash ?? null)
+      // Utilisation = total allocation task count for this butler in date range
+      // Each task (Check-In, Check-Out, Booking, Non Booking) = 1 working day
+      // Allocation tasks notes format: "Butler: Name · ButlerID: id · Date: YYYY-MM-DD"
+      const utilisationFinal = allocTasks.length > 0 ? allocTasks.length : null
 
       // Guest Welcome %: welcome tasks completed / total assigned
       const welcomeTasks = allTasks.filter((t: any) => {
