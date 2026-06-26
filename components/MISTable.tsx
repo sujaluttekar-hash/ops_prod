@@ -2,11 +2,11 @@
 import { useState, useEffect, useMemo } from 'react'
 
 const TARGETS = {
-  utilisation: 18,
-  sevenStar:   65,
+  utilisation:  25,   // sheet: 25
+  sevenStar:    60,   // sheet: 60%
   ota:         50,
-  guestWelcome: 100,
-  guestDelight: 80,
+  guestWelcome: 80,   // sheet: 80%
+  guestDelight: 100,  // sheet: 100%
   registration: 100,
 }
 
@@ -39,6 +39,56 @@ function UtilCell({ val, target }: { val: number | null; target: number }) {
   else { bg = 'rgba(233,160,167,0.2)'; color = '#8B2020' }
   return (
     <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, fontWeight: 600, color, background: bg, border: '1px solid #E5E7EB' }}>{val}</td>
+  )
+}
+
+
+function avg(vals: (number | null)[]): number | null {
+  const valid = vals.filter(v => v !== null) as number[]
+  return valid.length > 0 ? Math.round(valid.reduce((a,b) => a+b, 0) / valid.length) : null
+}
+
+function SquadSummary({ rows }: { rows: any[] }) {
+  const squads = [...new Set(rows.map(r => r.squad).filter(s => s && s !== '—'))]
+  if (squads.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sv-dark)', marginBottom: 10 }}>Squad Summary</div>
+      <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #E5E7EB' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {['Squad','Butlers','Utilisation','7 Star','OTA','Welcome','Delight','Registration'].map(h => (
+                <th key={h} style={{ padding: '9px 12px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#374151', textAlign: 'center', border: '1px solid #4B5563', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {squads.map((squad, i) => {
+              const squadRows = rows.filter(r => r.squad === squad)
+              const util  = avg(squadRows.map(r => r.utilisation))
+              const seven = avg(squadRows.map(r => r.sevenStar))
+              const ota   = avg(squadRows.map(r => r.ota))
+              const wel   = avg(squadRows.map(r => r.guestWelcome))
+              const del   = avg(squadRows.map(r => r.guestDelight))
+              const reg   = avg(squadRows.map(r => r.registration))
+              return (
+                <tr key={squad} style={{ background: i % 2 === 0 ? '#fff' : '#F9FAFB' }}>
+                  <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, border: '1px solid #E5E7EB' }}>{squad}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 12, textAlign: 'center', border: '1px solid #E5E7EB' }}>{squadRows.length}</td>
+                  {[{v:util,t:25},{v:seven,t:60},{v:ota,t:50},{v:wel,t:80},{v:del,t:100},{v:reg,t:100}].map(({v,t},j) => {
+                    const bg = v === null ? '#F9FAFB' : v >= t ? 'rgba(151,196,89,0.15)' : v >= t*0.7 ? 'rgba(254,213,169,0.2)' : 'rgba(233,160,167,0.15)'
+                    const col = v === null ? '#9CA3AF' : v >= t ? '#2D5A0E' : v >= t*0.7 ? '#7A4A08' : '#8B2020'
+                    return <td key={j} style={{ padding: '8px 12px', fontSize: 12, fontWeight: 600, textAlign: 'center', border: '1px solid #E5E7EB', background: bg, color: col }}>{v !== null ? (j === 0 ? v : `${v}%`) : '—'}</td>
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
@@ -126,6 +176,15 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
       const delightsWithPhotos = bDelights.filter((d: any) => (photosByDelight[d.id]||[]).length > 0)
       const delightPct = bDelights.length > 0 ? Math.round(delightsWithPhotos.length / bDelights.length * 100) : null
 
+      // Auto-generate Need Improvement flags like the sheet
+      const flags: string[] = []
+      if (utilisationFinal !== null && utilisationFinal < 25) flags.push('Utilisation')
+      if ((rd.seven_star_pct ?? null) !== null && rd.seven_star_pct < 60) flags.push('7 Star')
+      if ((rd.ota_pct ?? null) !== null && rd.ota_pct < 50) flags.push('OTA')
+      if (welcomePct !== null && welcomePct < 80) flags.push('Welcome')
+      if (delightPct !== null && delightPct < 100) flags.push('Delight')
+      if ((rd.registration_pct ?? null) !== null && rd.registration_pct < 100) flags.push('Registration')
+
       return {
         name: bName, squad: b.squad || '—',
         utilisation: utilisationFinal,
@@ -134,6 +193,7 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
         guestWelcome: welcomePct,
         guestDelight: delightPct,
         registration: rd.registration_pct ?? null,
+        flags,
       }
     })
   }, [butlers, allTasks, allDelights, allPhotos, redashData, start, end, photosByDelight])
@@ -190,6 +250,7 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
               <th style={{ ...thStyle }}>Guest<br/>Welcome<br/><span style={{ fontWeight: 400, opacity: 0.65, fontSize: 9.5 }}>Target: {TARGETS.guestWelcome}%</span></th>
               <th style={{ ...thStyle }}>Guest<br/>Delight<br/><span style={{ fontWeight: 400, opacity: 0.65, fontSize: 9.5 }}>Target: {TARGETS.guestDelight}%</span></th>
               <th style={{ ...thStyle }}>Guest<br/>Registration<br/><span style={{ fontWeight: 400, opacity: 0.65, fontSize: 9.5 }}>Target: {TARGETS.registration}%</span></th>
+              <th style={{ ...thStyle, background: '#2D3748', minWidth: 180 }}>⚠️ Need Improvement</th>
             </tr>
           </thead>
           <tbody>
@@ -203,12 +264,21 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
                 <Cell val={r.guestWelcome} target={TARGETS.guestWelcome} />
                 <Cell val={r.guestDelight} target={TARGETS.guestDelight} />
                 <Cell val={r.registration} target={TARGETS.registration} />
+                <td style={{ padding: '8px 10px', border: '1px solid #E5E7EB' }}>
+                  {(r as any).flags?.length === 0 ? (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#2D5A0E', background: 'rgba(151,196,89,0.12)', padding: '2px 8px', borderRadius: 20 }}>✅ On track</span>
+                  ) : (r as any).flags?.length > 0 ? (
+                    <div style={{ fontSize: 9.5, color: '#8B2020', fontWeight: 600, lineHeight: 1.5 }}>
+                      ⚠️ {(r as any).flags.join(', ')}
+                    </div>
+                  ) : null}
+                </td>
               </tr>
             ))}
             {/* Target row */}
             <tr style={{ background: '#F7F7F5' }}>
               <td colSpan={2} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 800, color: '#1B1D1F', border: '1px solid #E5E7EB' }}>🎯 Target</td>
-              {[TARGETS.utilisation, `${TARGETS.sevenStar}%`, `${TARGETS.ota}%`, `${TARGETS.guestWelcome}%`, `${TARGETS.guestDelight}%`, `${TARGETS.registration}%`].map((t, i) => (
+              {[TARGETS.utilisation, `${TARGETS.sevenStar}%`, `${TARGETS.ota}%`, `${TARGETS.guestWelcome}%`, `${TARGETS.guestDelight}%`, `${TARGETS.registration}%`, ''].map((t, i) => (
                 <td key={i} style={{ padding: '10px 12px', textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#1B1D1F', background: '#F7F7F5', border: '1px solid #E5E7EB' }}>{t}</td>
               ))}
             </tr>
@@ -221,8 +291,11 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
         <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'rgba(151,196,89,0.4)', marginRight: 4 }} />At/above target</span>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'rgba(254,213,169,0.5)', marginRight: 4 }} />70–99% of target</span>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'rgba(233,160,167,0.4)', marginRight: 4 }} />Below 70%</span>
-        <span style={{ marginLeft: 'auto' }}>7 Star & OTA from Redash · Guest Welcome & Delight from app</span>
+        <span style={{ marginLeft: 'auto' }}>7 Star & OTA from Redash · Welcome & Delight from app</span>
       </div>
+
+      {/* Squad-level summary — matches bottom section of mastersheet */}
+      <SquadSummary rows={rows} />
     </div>
   )
 }
