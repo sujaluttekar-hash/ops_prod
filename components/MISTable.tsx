@@ -176,14 +176,17 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
       const delightsWithPhotos = bDelights.filter((d: any) => (photosByDelight[d.id]||[]).length > 0)
       const delightPct = bDelights.length > 0 ? Math.round(delightsWithPhotos.length / bDelights.length * 100) : null
 
-      // Auto-generate Need Improvement flags like the sheet
+      // Auto-generate Need Improvement flags — only for metrics that have actual data
       const flags: string[] = []
-      if (utilisationFinal !== null && utilisationFinal < 25) flags.push('Utilisation')
-      if ((rd.seven_star_pct ?? null) !== null && rd.seven_star_pct < 60) flags.push('7 Star')
-      if ((rd.ota_pct ?? null) !== null && rd.ota_pct < 50) flags.push('OTA')
-      if (welcomePct !== null && welcomePct < 80) flags.push('Welcome')
-      if (delightPct !== null && delightPct < 100) flags.push('Delight')
-      if ((rd.registration_pct ?? null) !== null && rd.registration_pct < 100) flags.push('Registration')
+      const dataPoints: number[] = []
+      if (utilisationFinal !== null) { dataPoints.push(1); if (utilisationFinal < 25) flags.push('Utilisation') }
+      if ((rd.seven_star_pct ?? null) !== null) { dataPoints.push(1); if (rd.seven_star_pct < 60) flags.push('7 Star') }
+      if ((rd.ota_pct ?? null) !== null) { dataPoints.push(1); if (rd.ota_pct < 50) flags.push('OTA') }
+      if (welcomePct !== null) { dataPoints.push(1); if (welcomePct < 80) flags.push('Welcome') }
+      if (delightPct !== null) { dataPoints.push(1); if (delightPct < 100) flags.push('Delight') }
+      if ((rd.registration_pct ?? null) !== null) { dataPoints.push(1); if (rd.registration_pct < 100) flags.push('Registration') }
+      // hasData = at least 1 metric has a real value
+      const hasData = dataPoints.length > 0
 
       return {
         name: bName, squad: b.squad || '—',
@@ -194,6 +197,7 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
         guestDelight: delightPct,
         registration: rd.registration_pct ?? null,
         flags,
+        hasData: dataPoints.length > 0,
       }
     })
   }, [butlers, allTasks, allDelights, allPhotos, redashData, start, end, photosByDelight])
@@ -265,13 +269,15 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
                 <Cell val={r.guestDelight} target={TARGETS.guestDelight} />
                 <Cell val={r.registration} target={TARGETS.registration} />
                 <td style={{ padding: '8px 10px', border: '1px solid #E5E7EB' }}>
-                  {(r as any).flags?.length === 0 ? (
+                  {!(r as any).hasData ? (
+                    <span style={{ fontSize: 10, color: '#9CA3AF' }}>No data yet</span>
+                  ) : (r as any).flags?.length === 0 ? (
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#2D5A0E', background: 'rgba(151,196,89,0.12)', padding: '2px 8px', borderRadius: 20 }}>✅ On track</span>
-                  ) : (r as any).flags?.length > 0 ? (
+                  ) : (
                     <div style={{ fontSize: 9.5, color: '#8B2020', fontWeight: 600, lineHeight: 1.5 }}>
                       ⚠️ {(r as any).flags.join(', ')}
                     </div>
-                  ) : null}
+                  )}
                 </td>
               </tr>
             ))}
