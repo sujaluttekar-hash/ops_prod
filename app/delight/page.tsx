@@ -19,6 +19,7 @@ const CATEGORIES = [
 
 const BOOKING_TYPES = ['Check in','Check out','Booking (full day)','Non Booking Task'];
 type PhotoVal = { file: File; preview: string; timestamp: string } | null;
+type VideoVal = { file: File; name: string } | null;
 
 // ── Villa search ──────────────────────────────────────────────
 function VillaSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -48,9 +49,10 @@ function VillaSearch({ value, onChange }: { value: string; onChange: (v: string)
 }
 
 // ── Category card in modal ────────────────────────────────────
-function CategoryCard({ cat, photo, existingPhoto, subtypes, onPhoto, onSubtype }: { cat: typeof CATEGORIES[0]; photo: PhotoVal; existingPhoto?: any; subtypes: string[]; onPhoto: (v: PhotoVal) => void; onSubtype: (s: string) => void }) {
+function CategoryCard({ cat, photo, existingPhoto, subtypes, onPhoto, onSubtype, video, onVideo }: { cat: typeof CATEGORIES[0]; photo: PhotoVal; existingPhoto?: any; subtypes: string[]; onPhoto: (v: PhotoVal) => void; onSubtype: (s: string) => void; video?: VideoVal; onVideo?: (v: VideoVal) => void }) {
   const camRef = useRef<HTMLInputElement>(null);
   const galRef = useRef<HTMLInputElement>(null);
+  const vidRef = useRef<HTMLInputElement>(null);
   const hasNewPhoto = !!photo;
   const hasExistingPhoto = !!existingPhoto?.public_url && !photo; // show existing only if no new photo selected
   const hasPhoto = hasNewPhoto || hasExistingPhoto;
@@ -104,12 +106,36 @@ function CategoryCard({ cat, photo, existingPhoto, subtypes, onPhoto, onSubtype 
         </div>
       )}
 
+      {/* Video preview */}
+      {video && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', background: 'rgba(151,196,89,0.08)', border: '1px solid #97C459', borderRadius: 8 }}>
+          <span style={{ fontSize: 16 }}>🎥</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#2D5A0E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.name}</div>
+            <div style={{ fontSize: 9, color: '#2D5A0E' }}>{(video.file.size / 1024 / 1024).toFixed(1)}MB · ready</div>
+          </div>
+          <button type="button" onClick={() => onVideo && onVideo(null)} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#8B2020' }}>✕</button>
+        </div>
+      )}
+
       {/* Upload buttons */}
       <input ref={camRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: 'none' }} />
       <input ref={galRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+      <input ref={vidRef} type="file" accept="video/*,video/mp4,video/quicktime,video/avi"
+        onChange={e => {
+          const f = e.target.files?.[0];
+          if (!f) return;
+          if (f.size > 100 * 1024 * 1024) { alert('Video must be under 100MB'); return; }
+          if (onVideo) onVideo({ file: f, name: f.name });
+          e.target.value = '';
+        }}
+        style={{ display: 'none' }} />
       <div style={{ display: 'flex', gap: 6 }}>
         <button type="button" onClick={() => camRef.current?.click()} className="sv-btn" style={{ flex: 1, fontSize: 11, padding: '5px 0' }}>📷 {hasExistingPhoto ? 'Replace' : hasNewPhoto ? 'Retake' : 'Camera'}</button>
         <button type="button" onClick={() => galRef.current?.click()} className="sv-btn" style={{ flex: 1, fontSize: 11, padding: '5px 0' }}>🖼 Gallery</button>
+        {onVideo && (
+          <button type="button" onClick={() => vidRef.current?.click()} className="sv-btn" style={{ flex: 1, fontSize: 11, padding: '5px 0', color: video ? '#2D5A0E' : undefined, borderColor: video ? '#97C459' : undefined }}>🎥 {video ? 'Replace' : 'Video'}</button>
+        )}
       </div>
     </div>
   );
@@ -390,6 +416,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
     booking_type: editEntry?.booking_type || '',
   });
   const [photos, setPhotos] = useState<Record<string, PhotoVal>>(Object.fromEntries(CATEGORIES.map(c => [c.key, null])));
+  const [videos, setVideos] = useState<Record<string, VideoVal>>(Object.fromEntries(CATEGORIES.map(c => [c.key, null])));
   const [subtypes, setSubtypes] = useState<Record<string, string[]>>(Object.fromEntries(CATEGORIES.map(c => [c.key, []])));
   // Existing photos from DB (for edit mode) — keyed by pointer_key
   const existingPhotos: Record<string, any> = Object.fromEntries(
@@ -451,6 +478,31 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
           if (insErr) {
             console.error('Photo save error:', insErr.message);
           }
+        }
+      }
+
+      // Upload videos (if any) — saved as separate rows with video_url
+      for (const cat of CATEGORIES) {
+        const v = videos[cat.key];
+        if (!v) continue;
+        try {
+          const ext = v.file.name.split('.').pop()?.toLowerCase() || 'mp4';
+          const contentType = ext === 'mov' ? 'video/quicktime' : ext === 'avi' ? 'video/avi' : 'video/mp4';
+          const vPath = `${entryId}/${cat.key}_video_${Date.now()}.${ext}`;
+          const { data: vUp, error: vErr } = await sb.storage
+            .from('delight-photos')
+            .upload(vPath, v.file, { upsert: true, contentType });
+          if (vUp && !vErr) {
+            const { data: { publicUrl: videoUrl } } = sb.storage.from('delight-photos').getPublicUrl(vUp.path);
+            await sb.from('delight_photos')
+              .update({ video_url: videoUrl })
+              .eq('delight_id', entryId)
+              .eq('pointer_key', cat.key);
+          } else if (vErr) {
+            console.error('Video upload error:', vErr.message);
+          }
+        } catch (e: any) {
+          console.error('Video upload failed:', e.message);
         }
       }
 
@@ -551,6 +603,8 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
               subtypes={subtypes[cat.key] || []}
               onPhoto={v => setPhotos(prev => ({ ...prev, [cat.key]: v }))}
               onSubtype={s => toggleSubtype(cat.key, s)}
+              video={videos[cat.key]}
+              onVideo={v => setVideos(prev => ({ ...prev, [cat.key]: v }))}
             />
           ))}
         </div>
