@@ -460,51 +460,56 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         entryId = data.id;
       }
 
-      // Upload new photos
-      for (const cat of CATEGORIES) {
-        const p = photos[cat.key];
-        if (!p) continue;
-        const path = `${entryId}/${cat.key}_${Date.now()}.jpg`;
-        const { data: upData } = await sb.storage.from('delight-photos').upload(path, p.file, { upsert: true });
-        if (upData) {
-          const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(upData.path);
-          // Insert new row — supports multiple photos per category
-          const { error: insErr } = await sb.from('delight_photos').insert({
-            delight_id: entryId,
-            pointer_key: cat.key,
-            storage_path: path,
-            public_url: publicUrl,
-            photo_status: 'pending',
-          });
-          if (insErr) {
-            console.error('Photo save error:', insErr.message);
-          }
-        }
-      }
-
-      // Upload videos (if any) — saved as separate rows with video_url
-      for (const cat of CATEGORIES) {
-        const v = videos[cat.key];
-        if (!v) continue;
+      // Upload photos — run in parallel for speed, still awaited so user sees count
+      const photosToUpload = CATEGORIES.filter(cat => photos[cat.key]);
+      await Promise.all(photosToUpload.map(async cat => {
+        const p = photos[cat.key]!;
         try {
-          const ext = v.file.name.split('.').pop()?.toLowerCase() || 'mp4';
-          const contentType = ext === 'mov' ? 'video/quicktime' : ext === 'avi' ? 'video/avi' : 'video/mp4';
-          const vPath = `${entryId}/${cat.key}_video_${Date.now()}.${ext}`;
-          const { data: vUp, error: vErr } = await sb.storage
-            .from('delight-photos')
-            .upload(vPath, v.file, { upsert: true, contentType });
-          if (vUp && !vErr) {
-            const { data: { publicUrl: videoUrl } } = sb.storage.from('delight-photos').getPublicUrl(vUp.path);
-            await sb.from('delight_photos')
-              .update({ video_url: videoUrl })
-              .eq('delight_id', entryId)
-              .eq('pointer_key', cat.key);
-          } else if (vErr) {
-            console.error('Video upload error:', vErr.message);
+          const ext = p.file.type.includes('png') ? 'png' : 'jpg';
+          const path = `${entryId}/${cat.key}_${Date.now()}.${ext}`;
+          const { data: upData } = await sb.storage.from('delight-photos').upload(path, p.file, { upsert: true, contentType: p.file.type || 'image/jpeg' });
+          if (upData) {
+            const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(upData.path);
+            await sb.from('delight_photos').insert({
+              delight_id: entryId,
+              pointer_key: cat.key,
+              storage_path: path,
+              public_url: publicUrl,
+              photo_status: 'pending',
+            });
           }
         } catch (e: any) {
-          console.error('Video upload failed:', e.message);
+          console.error('Photo save error:', e.message);
         }
+      }));
+
+      // Upload videos NON-BLOCKING — fires after save, doesn't block user
+      const videosToUpload = CATEGORIES.filter(cat => videos[cat.key]);
+      if (videosToUpload.length > 0) {
+        // Don't await — runs in background after modal closes
+        Promise.all(videosToUpload.map(async cat => {
+          const v = videos[cat.key]!;
+          try {
+            const ext = v.file.name.split('.').pop()?.toLowerCase() || 'mp4';
+            const contentType = ext === 'mov' ? 'video/quicktime' : ext === 'avi' ? 'video/avi' : 'video/mp4';
+            const vPath = `${entryId}/${cat.key}_video_${Date.now()}.${ext}`;
+            const { data: vUp } = await sb.storage
+              .from('delight-photos')
+              .upload(vPath, v.file, { upsert: true, contentType });
+            if (vUp) {
+              const { data: { publicUrl: videoUrl } } = sb.storage.from('delight-photos').getPublicUrl(vUp.path);
+              // Insert as new row with video_url (no public_url for video-only rows)
+              await sb.from('delight_photos').insert({
+                delight_id: entryId,
+                pointer_key: cat.key,
+                video_url: videoUrl,
+                photo_status: 'pending',
+              });
+            }
+          } catch (e: any) {
+            console.error('Video upload failed:', e.message);
+          }
+        })).catch(() => {});
       }
 
       // If editing, update form fields too
@@ -720,7 +725,12 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
             </button>
           )}
           <button className="sv-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setExpanded(v => !v)}>
-            {expanded ? '▲' : `📷 ${photos.length}`}
+            {expanded ? '▲' : (() => {
+              const photoCount = photos.filter((p: any) => p.public_url).length;
+              const videoCount = photos.filter((p: any) => p.video_url).length;
+              if (videoCount > 0) return `📷${photoCount} 🎥${videoCount}`;
+              return `📷 ${photoCount}`;
+            })()}
           </button>
         </div>
       </div>
@@ -838,7 +848,7 @@ export default function DelightPage() {
       const { data: delights } = await delightQ;
 
       const { data: allPhotos } = await sb.from('delight_photos')
-        .select('*');
+        .select('id,delight_id,pointer_key,public_url,storage_path,photo_status,video_url');
 
       // Merge photos into their delight entries
       const photosMap: Record<string, any[]> = {};
