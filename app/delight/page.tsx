@@ -54,7 +54,7 @@ function CategoryCard({ cat, photo, existingPhoto, subtypes, onPhoto, onSubtype,
   const galRef = useRef<HTMLInputElement>(null);
   const vidRef = useRef<HTMLInputElement>(null);
   const hasNewPhoto = !!photo;
-  const hasExistingPhoto = !!existingPhoto?.public_url && !photo; // show existing only if no new photo selected
+  const hasExistingPhoto = !!existingPhoto?.public_url && !photo;
   const hasPhoto = hasNewPhoto || hasExistingPhoto;
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -433,7 +433,9 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
     });
   }
 
+  // Count categories that have at least one photo (new or existing)
   const uploadedCount = CATEGORIES.filter(cat => photos[cat.key] || existingPhotos[cat.key]).length;
+  const totalNewFiles = Object.values(photos).filter(Boolean).length + Object.values(videos).filter(Boolean).length;
 
   async function handleSave() {
     if (!form.booking_id && form.booking_type !== 'Non Booking Task') { setError('Booking ID is required for this task type'); return; }
@@ -466,14 +468,13 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         const { data: upData } = await sb.storage.from('delight-photos').upload(path, p.file, { upsert: true });
         if (upData) {
           const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(upData.path);
-          // Delete existing photo for this category then insert fresh (avoids upsert constraint issues)
-          await sb.from('delight_photos').delete().eq('delight_id', entryId).eq('pointer_key', cat.key);
+          // Insert new row — supports multiple photos per category
           const { error: insErr } = await sb.from('delight_photos').insert({
             delight_id: entryId,
             pointer_key: cat.key,
             storage_path: path,
             public_url: publicUrl,
-            photo_status: 'pending',  // reset to pending so admin can re-review
+            photo_status: 'pending',
           });
           if (insErr) {
             console.error('Photo save error:', insErr.message);
@@ -618,7 +619,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="sv-btn" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
           <button className="sv-btn sv-btn-primary" onClick={handleSave} disabled={saving} style={{ flex: 2 }}>
-            {saving ? 'Saving…' : isEdit ? '✓ Save changes' : `Submit (${uploadedCount} photo${uploadedCount !== 1 ? 's' : ''})`}
+            {saving ? 'Saving…' : isEdit ? `✓ Save (${totalNewFiles} new file${totalNewFiles !== 1 ? 's' : ''})` : `Submit (${uploadedCount} photo${uploadedCount !== 1 ? 's' : ''})`}
           </button>
         </div>
       </div>
@@ -727,39 +728,68 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
       {/* Photo grid */}
       {expanded && (
         <div style={{ marginTop: 14, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {CATEGORIES.map(cat => {
-              const p = photos.find((ph: any) => ph.pointer_key === cat.key);
+              const catPhotos = photos.filter((ph: any) => ph.pointer_key === cat.key);
+              const hasAny = catPhotos.length > 0;
               return (
-                <div key={cat.key} style={{ borderRadius: 10, overflow: 'hidden', border: `1.5px solid ${p?.photo_status === 'approved' ? '#97C459' : p?.photo_status === 'declined' ? '#E9A0A7' : p ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.08)'}`, background: p ? '#fff' : 'var(--muted)' }}>
-                  {p ? (
-                    <img src={p.public_url} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
-                  ) : (
-                    <div style={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{cat.emoji}</div>
-                  )}
-                  <div style={{ padding: '6px 8px' }}>
-                    <div style={{ fontSize: 10, fontWeight: 600 }}>{cat.emoji} {cat.label}</div>
-                    {p?.subtypes?.length > 0 && <div style={{ fontSize: 9, color: 'var(--muted-fg)', marginTop: 1 }}>{Array.isArray(p.subtypes) ? p.subtypes.join(', ') : ''}</div>}
-                    {!p && <div style={{ fontSize: 9, color: 'var(--muted-fg)' }}>Not uploaded</div>}
-                    {/* Approve / Decline for admin */}
-                    {p && canAcknowledge && (
-                      <div style={{ marginTop: 5 }}>
-                        {p.photo_status === 'approved' ? (
-                          <span style={{ fontSize: 9, fontWeight: 700, color: '#2D5A0E', background: 'rgba(151,196,89,0.12)', padding: '2px 6px', borderRadius: 4 }}>✅ Approved</span>
-                        ) : p.photo_status === 'declined' ? (
-                          <div>
-                            <span style={{ fontSize: 9, fontWeight: 700, color: '#8B2020', background: 'rgba(233,160,167,0.12)', padding: '2px 6px', borderRadius: 4 }}>❌ Declined</span>
-                            <button onClick={() => onPhotoAction(p.id, 'approved')} style={{ marginLeft: 4, fontSize: 8, padding: '1px 5px', borderRadius: 3, border: '1px solid #97C459', background: 'none', color: '#2D5A0E', cursor: 'pointer' }}>Approve</button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
-                            <button onClick={() => onPhotoAction(p.id, 'approved')} style={{ flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 4, border: 'none', background: 'rgba(151,196,89,0.15)', color: '#2D5A0E', cursor: 'pointer', fontWeight: 600 }}>✅ Ok</button>
-                            <button onClick={() => onDecline(p.id, cat.label)} style={{ flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 4, border: 'none', background: 'rgba(233,160,167,0.12)', color: '#8B2020', cursor: 'pointer', fontWeight: 600 }}>❌ Redo</button>
-                          </div>
-                        )}
-                      </div>
+                <div key={cat.key} style={{ borderRadius: 10, border: `1.5px solid ${hasAny ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.06)'}`, background: hasAny ? '#fff' : '#F9FAFB', overflow: 'hidden' }}>
+                  {/* Category header */}
+                  <div style={{ padding: '8px 12px', borderBottom: hasAny ? '1px solid rgba(0,0,0,0.06)' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 16 }}>{cat.emoji}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sv-dark)' }}>{cat.label}</span>
+                    {hasAny ? (
+                      <span style={{ fontSize: 9, color: '#2D5A0E', background: 'rgba(151,196,89,0.1)', padding: '1px 6px', borderRadius: 10, marginLeft: 'auto' }}>{catPhotos.length} file{catPhotos.length > 1 ? 's' : ''}</span>
+                    ) : (
+                      <span style={{ fontSize: 9, color: '#9CA3AF', marginLeft: 'auto' }}>Not uploaded</span>
                     )}
                   </div>
+                  {/* Files grid */}
+                  {hasAny && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, padding: 8 }}>
+                      {catPhotos.map((p: any, idx: number) => (
+                        <div key={p.id || idx} style={{ borderRadius: 8, overflow: 'hidden', border: `1.5px solid ${p.photo_status === 'approved' ? '#97C459' : p.photo_status === 'declined' ? '#E9A0A7' : 'rgba(0,0,0,0.08)'}` }}>
+                          {/* Photo */}
+                          {p.public_url && (
+                            <img src={p.public_url} style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
+                          )}
+                          {/* Video */}
+                          {p.video_url && (
+                            <div style={{ background: '#141618', padding: '6px 0' }}>
+                              <video src={p.video_url} controls style={{ width: '100%', maxHeight: 140, display: 'block' }} playsInline />
+                            </div>
+                          )}
+                          {/* Only video, no photo */}
+                          {!p.public_url && !p.video_url && (
+                            <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📎</div>
+                          )}
+                          {/* Status + admin actions */}
+                          <div style={{ padding: '5px 7px' }}>
+                            <div style={{ fontSize: 9, color: '#9CA3AF' }}>
+                              {p.public_url && p.video_url ? '📷+🎥' : p.video_url ? '🎥 Video' : `📷 ${idx + 1}`}
+                            </div>
+                            {canAcknowledge && (
+                              <div style={{ marginTop: 3 }}>
+                                {p.photo_status === 'approved' ? (
+                                  <span style={{ fontSize: 8, fontWeight: 700, color: '#2D5A0E', background: 'rgba(151,196,89,0.12)', padding: '1px 5px', borderRadius: 3 }}>✅ Approved</span>
+                                ) : p.photo_status === 'declined' ? (
+                                  <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 8, fontWeight: 700, color: '#8B2020', background: 'rgba(233,160,167,0.12)', padding: '1px 5px', borderRadius: 3 }}>❌ Redo</span>
+                                    <button onClick={() => onPhotoAction(p.id, 'approved')} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, border: '1px solid #97C459', background: 'none', color: '#2D5A0E', cursor: 'pointer' }}>Approve</button>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: 2 }}>
+                                    <button onClick={() => onPhotoAction(p.id, 'approved')} style={{ flex: 1, fontSize: 8, padding: '2px 0', borderRadius: 3, border: 'none', background: 'rgba(151,196,89,0.15)', color: '#2D5A0E', cursor: 'pointer', fontWeight: 600 }}>✅ Ok</button>
+                                    <button onClick={() => onDecline(p.id, cat.label)} style={{ flex: 1, fontSize: 8, padding: '2px 0', borderRadius: 3, border: 'none', background: 'rgba(233,160,167,0.12)', color: '#8B2020', cursor: 'pointer', fontWeight: 600 }}>❌ Redo</button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
