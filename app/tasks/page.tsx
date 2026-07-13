@@ -29,6 +29,7 @@ function AssignTaskModal({ onClose, onDone }: { onClose: () => void; onDone: () 
   const [form, setForm] = useState({ butler_id: '', butler_name: '', task_type: '', villa: '', due_time: '', notes: '', booking_type: 'Booking' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const isSelfMode = (() => { try { const s = localStorage.getItem('sv_local_session'); return s ? JSON.parse(s).role === 'butler' : false; } catch { return false; } })();
 
   useEffect(() => {
     getServiceSupabase().from('profiles').select('id,name,squad').eq('role','butler').eq('is_active',true).order('name')
@@ -36,23 +37,32 @@ function AssignTaskModal({ onClose, onDone }: { onClose: () => void; onDone: () 
   }, []);
 
   async function handleSave() {
-    if (!form.butler_id || !form.task_type) { setError('Select butler and task type'); return; }
+    // Butlers assign to themselves; admins/supervisors pick a butler
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('sv_local_session') : null;
+    const localUser = stored ? JSON.parse(stored) : {};
+    const isSelf = localUser.role === 'butler';
+    const targetId   = isSelf ? localUser.id   : form.butler_id;
+    const targetName = isSelf ? localUser.name  : (butlers.find((b:any) => b.id === form.butler_id)?.name || '');
+
+    if (!targetId || !form.task_type) { setError(isSelf ? 'Select a task type' : 'Select butler and task type'); return; }
     setSaving(true); setError('');
-    const butler = butlers.find(b => b.id === form.butler_id);
-    const notes = [`Butler: ${butler?.name || ''}`, `ButlerID: ${form.butler_id}`, form.villa ? `Villa: ${form.villa}` : '', form.notes || ''].filter(Boolean).join(' · ');
+    const today = new Date().toISOString().slice(0,10);
+    const notes = [`Butler: ${targetName}`, `ButlerID: ${targetId}`, `Date: ${today}`, form.villa ? `Villa: ${form.villa}` : '', form.notes || ''].filter(Boolean).join(' · ');
     const { error: err } = await getServiceSupabase().from('tasks').insert({
       type: form.task_type === 'Custom task' ? (form.notes || 'Custom task') : form.task_type,
-      butler_id: form.butler_id, status: 'pending',
+      butler_id: targetId, status: 'pending',
       due_time: form.due_time || null, notes,
     });
     if (err) { setError(err.message); setSaving(false); return; }
-    try {
-      await getServiceSupabase().from('notifications').insert({
-        user_id: form.butler_id, title: 'New task assigned',
-        body: `${form.task_type}${form.villa ? ' at ' + form.villa : ''}${form.due_time ? ' · Due ' + form.due_time : ''}`,
-        type: 'task', read: false,
-      });
-    } catch {}
+    if (!isSelf) {
+      try {
+        await getServiceSupabase().from('notifications').insert({
+          user_id: targetId, title: 'New task assigned',
+          body: `${form.task_type}${form.villa ? ' at ' + form.villa : ''}${form.due_time ? ' · Due ' + form.due_time : ''}`,
+          type: 'task', read: false,
+        });
+      } catch {}
+    }
     onDone(); onClose();
   }
 
@@ -76,20 +86,27 @@ const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>Assign task</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{isSelfMode ? '+ Create task' : 'Assign task'}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted-fg)' }}>✕</button>
         </div>
         <div className="sv-strip" style={{ marginBottom: 18 }} />
         {error && <div style={{ background: 'rgba(233,160,167,0.15)', border: '1px solid #E9A0A7', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#8B2020', marginBottom: 14 }}>⚠ {error}</div>}
 
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Butler *</div>
-          <select className="sv-select" style={{ width: '100%' }} value={form.butler_id}
-            onChange={e => { const b = butlers.find(x => x.id === e.target.value); setForm(f => ({ ...f, butler_id: e.target.value, butler_name: b?.name || '' })); }}>
-            <option value="">Select butler…</option>
-            {butlers.map(b => <option key={b.id} value={b.id}>{b.name} · {b.squad}</option>)}
-          </select>
-        </div>
+        {/* Butler selector — shown only to admin/supervisor; butler creates for themselves */}
+        {isSelfMode ? (
+          <div style={{ padding: '10px 14px', background: 'rgba(156,204,252,0.08)', borderRadius: 10, marginBottom: 14, fontSize: 13, color: '#0C447C' }}>
+            👤 Creating task for yourself
+          </div>
+        ) : (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Butler *</div>
+            <select className="sv-select" style={{ width: '100%' }} value={form.butler_id}
+              onChange={e => { const b = butlers.find((x:any) => x.id === e.target.value); setForm(f => ({ ...f, butler_id: e.target.value, butler_name: b?.name || '' })); }}>
+              <option value="">Select butler…</option>
+              {butlers.map((b:any) => <option key={b.id} value={b.id}>{b.name} · {b.squad}</option>)}
+            </select>
+          </div>
+        )}
 
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Task type *</div>
@@ -121,7 +138,7 @@ const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="sv-btn" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
           <button className="sv-btn sv-btn-primary" onClick={handleSave} disabled={saving} style={{ flex: 2 }}>
-            {saving ? 'Assigning…' : 'Assign task'}
+            {saving ? 'Saving…' : isSelfMode ? 'Create task' : 'Assign task'}
           </button>
         </div>
       </div>
@@ -558,10 +575,10 @@ export default function TasksPage() {
         // Also re-fetch from Supabase after a short delay
         setTimeout(load, 1000);
       }} />}
-      <Topbar title={isSuper ? 'Tasks' : 'My tasks'} subtitle={isSuper ? 'Assign and track butler tasks' : `Tasks assigned to you`}
+      <Topbar title={isSuper ? 'Audit' : 'Audit'} subtitle={isSuper ? 'Assign and track butler tasks' : 'Your tasks'}
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
-            {isSuper && <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowAssign(true)}>+ Assign task</button>}
+            <button className="sv-btn sv-btn-primary" style={{ fontSize: 12 }} onClick={() => setShowAssign(true)}>{isSuper ? '+ Assign task' : '+ Create task'}</button>
             <button className="sv-btn" style={{ fontSize: 12 }} onClick={() => load()}>↻ Refresh</button>
           </div>
         } />

@@ -14,9 +14,9 @@ const navByRole: Record<string, NavSection> = {
     overview: [{ label: 'Dashboard', href: '/dashboard', icon: '📊' }],
     operations: [
       { label: 'Daily roster', href: '/allocation', icon: '📋' },
-      { label: 'Guest delight', href: '/delight', icon: '🎁' },
+      { label: 'Task', href: '/delight', icon: '🎁' },
       { label: 'Photo gallery', href: '/gallery', icon: '📸' },
-      { label: 'Tasks', href: '/tasks', icon: '✓' },
+      { label: 'Audit', href: '/tasks', icon: '✓' },
       { label: 'Cases', href: '/incidents', icon: '🆘' },
       { label: 'Attendance', href: '/attendance', icon: '📅' },
       { label: 'Huddles', href: '/huddle', icon: '💬' },
@@ -38,9 +38,9 @@ const navByRole: Record<string, NavSection> = {
     overview: [{ label: 'Dashboard', href: '/dashboard', icon: '📊' }],
     operations: [
       { label: 'Daily roster', href: '/allocation', icon: '📋' },
-      { label: 'Guest delight', href: '/delight', icon: '🎁' },
+      { label: 'Task', href: '/delight', icon: '🎁' },
       { label: 'Photo gallery', href: '/gallery', icon: '📸' },
-      { label: 'Tasks', href: '/tasks', icon: '✓' },
+      { label: 'Audit', href: '/tasks', icon: '✓' },
       { label: 'Cases', href: '/incidents', icon: '🆘' },
       { label: 'Attendance', href: '/attendance', icon: '📅' },
       { label: 'Huddles', href: '/huddle', icon: '💬' },
@@ -55,9 +55,9 @@ const navByRole: Record<string, NavSection> = {
   butler: {
     overview: [{ label: 'Dashboard', href: '/dashboard', icon: '📊' }],
     operations: [
-      { label: 'Log activity', href: '/delight', icon: '🎁' },
+      { label: 'Task', href: '/delight', icon: '🎁' },
       { label: 'Submit task', href: '/submit', icon: '✓' },
-      { label: 'My tasks', href: '/tasks', icon: '📋' },
+      { label: 'Audit', href: '/tasks', icon: '📋' },
       { label: 'Cases', href: '/incidents', icon: '🆘' },
       { label: 'Attendance', href: '/attendance', icon: '📅' },
       { label: 'My calendar', href: '/butler-calendar', icon: '🗓' },

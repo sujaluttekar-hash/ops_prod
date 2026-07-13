@@ -998,7 +998,7 @@ ${newComment}` : newComment,
         />
       )}
 
-      <Topbar title="Guest delight" subtitle="Log and track villa activities"
+      <Topbar title="Task" subtitle="Log and track villa activities"
         actions={
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {isSuper && (
