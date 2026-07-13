@@ -6,6 +6,7 @@ const USERS: Record<string, { password: string; role: string; name: string; squa
   'admin@stayvista.com':         { id: 'd035c01f-6987-4e76-8ab7-a562235ed2c8', password: 'StayVista@2026', role: 'super_admin', name: 'Aditi',           squad: 'All'      },
   'sujal@stayvista.com':         { id: '8d5da751-3269-4d77-b837-45253a9435c5', password: 'sujal@123',      role: 'ops_manager', name: 'Sujal',           squad: 'All'      },
   'sujal.uttekar@stayvista.com': { id: 'd71e6f0f-916d-4fec-af8d-d14113f70ae4', password: 'StayVista@2026', role: 'butler',      name: 'Sujal Uttekar',   squad: null       },
+  'arbaz@stayvista.com':         { id: 'bfdbc167-f99e-40d0-80fc-ba25dc85cc36', password: 'arbaz@123',      role: 'butler',      name: 'Arbaz',           squad: 'Karjat'   },
   'atish@stayvista.com':         { id: 'fedb395e-476c-43d7-a76f-c87f8e508856', password: 'atish@123',      role: 'butler',      name: 'Atish Tandkar',   squad: 'Nashik'   },
   'kalpesh@stayvista.com':       { id: '30ebc89e-17fc-43db-b9a8-46398d24a1e3', password: 'kalpesh@123',    role: 'butler',      name: 'Kalpesh Ther',    squad: 'Alibaug'  },
   'kohinoor@stayvista.com':      { id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', password: 'kohinoor@123',   role: 'butler',      name: 'Kohinoor Shinde', squad: 'Karjat'   },
