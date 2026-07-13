@@ -5,17 +5,21 @@ import { PROPERTIES } from '@/lib/properties-data';
 import { getServiceSupabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
-type Property = { id: string; name: string; squad: string; address: string; lat: number; lng: number; kms: number; };
+type Property = { id: number; name: string; city: string; squad: string; slug: string; primary_id: number; lat: number | null; lng: number | null; };
 type TaskPin = { id: string; type: string; status: string; butler: string; villa: string; due_time: string | null; lat: number; lng: number; };
 
 const SQUAD_COLORS = {
   Lonavala: '#9CCCFC',
   Karjat: '#97C459',
+  Alibaug: '#FED5A9',
+  Pune: '#C4B5FD',
 };
 
 const SQUAD_CENTER: Record<string, [number, number]> = {
   Lonavala: [18.754, 73.405],
   Karjat: [18.920, 73.350],
+  Alibaug: [18.641, 72.875],
+  Pune: [18.520, 73.856],
 };
 
 export default function MapPage() {
@@ -36,6 +40,8 @@ export default function MapPage() {
   const butlerMarkersRef = useRef<any[]>([]);
   const [showLonavala, setShowLonavala] = useState(true);
   const [showKarjat, setShowKarjat] = useState(true);
+  const [showAlibaug, setShowAlibaug] = useState(true);
+  const [showPune, setShowPune] = useState(true);
 
   // Load live butler locations — poll every 30s
   useEffect(() => {
@@ -82,7 +88,7 @@ export default function MapPage() {
             butler: butlerMatch?.[1]?.trim() || 'Butler',
             villa: villaName,
             due_time: t.due_time,
-            lat: prop.lat, lng: prop.lng,
+            lat: prop.lat ?? 0, lng: prop.lng ?? 0,
           });
         });
         setTaskPins(pins);
@@ -91,7 +97,7 @@ export default function MapPage() {
 
   const filtered = PROPERTIES.filter(p => {
     const matchSquad = squadFilter === 'All' || p.squad === squadFilter;
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.address.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.city || "").toLowerCase().includes(search.toLowerCase());
     return matchSquad && matchSearch;
   });
 
@@ -134,6 +140,8 @@ export default function MapPage() {
     const visibleVillas = filtered.filter(p => {
       if (p.squad === 'Lonavala' && !showLonavala) return false;
       if (p.squad === 'Karjat' && !showKarjat) return false;
+      if (p.squad === 'Alibaug' && !showAlibaug) return false;
+      if (p.squad === 'Pune' && !showPune) return false;
       return true;
     });
     visibleVillas.forEach(p => {
@@ -158,14 +166,14 @@ export default function MapPage() {
         .on('click', () => setSelected(p));
 
       // Tooltip on hover
-      marker.bindTooltip(`<b>${p.name}</b><br>${p.squad} · ${p.kms} km`, {
+      marker.bindTooltip(`<b>${p.name}</b><br>${p.squad}`, {
         direction: 'top', offset: [0, -12],
         className: 'sv-map-tooltip',
       });
 
       markersRef.current.push(marker);
     });
-  }, [filtered, showLonavala, showKarjat, mapLoaded]);
+  }, [filtered, showLonavala, showKarjat, showAlibaug, showPune, mapLoaded]);
 
   // Render task pins as activity markers
   useEffect(() => {
@@ -280,6 +288,8 @@ export default function MapPage() {
 
   const lonavalaCount = PROPERTIES.filter(p => p.squad === 'Lonavala').length;
   const karjatCount = PROPERTIES.filter(p => p.squad === 'Karjat').length;
+  const alibaugCount = PROPERTIES.filter(p => p.squad === 'Alibaug').length;
+  const puneCount = PROPERTIES.filter(p => p.squad === 'Pune').length;
 
   return (
     <>
@@ -319,7 +329,7 @@ export default function MapPage() {
         {/* Squad summary cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 16 }}>
           {[
-            { label: 'All Properties', count: PROPERTIES.length, squad: 'All', color: '#E9A0A7', bg: 'rgba(233,160,167,0.1)' },
+            { label: 'All', count: PROPERTIES.length, squad: 'All', color: '#E9A0A7', bg: 'rgba(233,160,167,0.1)' },
             { label: 'Lonavala', count: lonavalaCount, squad: 'Lonavala', color: '#0C447C', bg: 'rgba(156,204,252,0.12)' },
             { label: 'Karjat', count: karjatCount, squad: 'Karjat', color: '#2D5A0E', bg: 'rgba(151,196,89,0.12)' },
           ].map(s => (
@@ -360,7 +370,7 @@ export default function MapPage() {
                       <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: SQUAD_COLORS[p.squad as keyof typeof SQUAD_COLORS] || '#E9A0A7' }} />
                       <div style={{ fontSize: 12, fontWeight: selected?.id === p.id ? 700 : 500, lineHeight: 1.3, flex: 1 }}>{p.name}</div>
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 3, paddingLeft: 15 }}>{p.squad} · {p.kms} km</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted-fg)', marginTop: 3, paddingLeft: 15 }}>{p.squad}</div>
                   </div>
                 ))}
               </div>
@@ -381,6 +391,8 @@ export default function MapPage() {
                 {[
                   { dot: '#9CCCFC', label: 'Lonavala villas', checked: showLonavala, toggle: () => setShowLonavala(v => !v) },
                   { dot: '#97C459', label: 'Karjat villas', checked: showKarjat, toggle: () => setShowKarjat(v => !v) },
+                  { dot: '#FED5A9', label: 'Alibaug villas', checked: showAlibaug, toggle: () => setShowAlibaug(v => !v) },
+                  { dot: '#C4B5FD', label: 'Pune villas', checked: showPune, toggle: () => setShowPune(v => !v) },
                   { dot: '#FED5A9', label: 'Pending tasks', square: true, checked: showTasks, toggle: () => setShowTasks(v => !v) },
                   { dot: '#1B1D1F', label: `Butlers (${butlerLocations.length}) 🟢live 🔴offline`, circle: true, checked: showButlers, toggle: () => setShowButlers(v => !v) },
                 ].map(l => (
@@ -404,13 +416,13 @@ export default function MapPage() {
                       <div style={{ fontSize: 14, fontWeight: 700 }}>{selected.name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                         <span className={`badge ${selected.squad === 'Lonavala' ? 'badge-blue' : 'badge-green'}`}>{selected.squad}</span>
-                        <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>{selected.kms} km from hub</span>
+                        
                         <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>ID: {selected.id}</span>
                       </div>
                     </div>
                     <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--muted-fg)', padding: '0 4px' }}>✕</button>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted-fg)', lineHeight: 1.5, marginBottom: 10 }}>{selected.address}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-fg)', lineHeight: 1.5, marginBottom: 10 }}>{selected.city}</div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <a href={`https://www.google.com/maps?q=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', flex: 1 }}>
                       <button className="sv-btn sv-btn-primary" style={{ width: '100%', fontSize: 11, justifyContent: 'center' }}>📍 Open in Google Maps</button>
@@ -446,8 +458,8 @@ export default function MapPage() {
                     <td>
                       <span className={`badge ${p.squad === 'Lonavala' ? 'badge-blue' : 'badge-green'}`}>{p.squad}</span>
                     </td>
-                    <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{p.kms} km</td>
-                    <td style={{ color: 'var(--muted-fg)', fontSize: 11, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.address}</td>
+                    <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{p.city}</td>
+                    <td style={{ color: 'var(--muted-fg)', fontSize: 11, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(p as any).city}</td>
                     <td>
                       <a href={`https://www.google.com/maps?q=${p.lat},${p.lng}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
                         <button className="sv-btn" style={{ fontSize: 10, padding: '3px 8px' }}>📍</button>

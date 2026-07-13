@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { fetchTasks, getServiceSupabase, uploadTaskPhoto, LOCAL_PROFILES, type Task } from '@/lib/supabase';
+import { PROPERTIES } from '@/lib/properties-data';
 import { getCurrentPosition } from '@/lib/get-location';
 import { getStatusBadge, getStatusLabel } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -127,7 +128,12 @@ const TASK_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
           <div>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Villa</div>
-            <input className="sv-input" style={{ width: '100%' }} placeholder="Villa name" value={form.villa} onChange={e => setForm(f => ({ ...f, villa: e.target.value }))} />
+            <input className="sv-input" style={{ width: '100%' }} placeholder="Search villa…" value={form.villa}
+              onChange={e => setForm(f => ({ ...f, villa: e.target.value }))}
+              list="task-villa-list" />
+            <datalist id="task-villa-list">
+              {PROPERTIES.map((p: any) => <option key={p.id} value={p.name} />)}
+            </datalist>
           </div>
           <div>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>Due time</div>
