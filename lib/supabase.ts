@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY } from './config'
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, APP_USERS } from './config'
 const SUPABASE_KEY = SUPABASE_ANON_KEY
 
 export const BUCKETS = {
@@ -30,20 +30,21 @@ export function getServiceSupabase() {
   return _serviceClient
 }
 
-// ─── Hardcoded profiles (shown when Supabase is unreachable) ─────────────────
-export const LOCAL_PROFILES: Profile[] = [
-  { id: 'd035c01f-6987-4e76-8ab7-a562235ed2c8', name: 'Aditi',           email: 'admin@stayvista.com',         role: 'super_admin', squad: 'All',      property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: '8d5da751-3269-4d77-b837-45253a9435c5', name: 'Sujal',           email: 'sujal@stayvista.com',         role: 'ops_manager', squad: 'All',      property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: 'd71e6f0f-916d-4fec-af8d-d14113f70ae4', name: 'Sujal Uttekar',   email: 'sujal.uttekar@stayvista.com', role: 'butler',      squad: null,       property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: 'fedb395e-476c-43d7-a76f-c87f8e508856', name: 'Atish Tandkar',   email: 'atish@stayvista.com',         role: 'butler',      squad: 'Nashik',   property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: '30ebc89e-17fc-43db-b9a8-46398d24a1e3', name: 'Kalpesh Ther',    email: 'kalpesh@stayvista.com',       role: 'butler',      squad: 'Alibaug',  property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', name: 'Kohinoor Shinde', email: 'kohinoor@stayvista.com',      role: 'butler',      squad: 'Karjat',   property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: '24e03c68-5cd0-47aa-a695-75850ac2a81d', name: 'Manoj Valmiki',   email: 'manoj@stayvista.com',         role: 'butler',      squad: 'Lonavala', property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: '326c84fa-7c94-42a4-b7a2-6545f1398308', name: 'Nimish',          email: 'nimish@stayvista.com',        role: 'butler',      squad: 'Alibaug',  property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: '0835f144-513d-4107-968f-bb0c3ddbd6df', name: 'Ravi Kumar',      email: 'butler@stayvista.com',        role: 'butler',      squad: 'Lonavala', property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: '4b2cc4e7-876b-490a-a315-192c67424328', name: 'Vinayak Kharade', email: 'vinayak@stayvista.com',       role: 'butler',      squad: 'Lonavala', property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-  { id: '4ab59e13-1d68-4607-bef8-b9fb013827ac', name: 'Vishal',          email: 'vishal@stayvista.com',        role: 'butler',      squad: 'Karjat',   property_id: null, phone: null, is_active: true, created_at: '2026-01-01T00:00:00Z', updated_at: null },
-]
+// ─── Local profiles — auto-derived from APP_USERS in lib/config.ts ────────────
+// When you add a user to APP_USERS, it appears here automatically.
+// No need to manually maintain this list.
+export const LOCAL_PROFILES: Profile[] = Object.entries(APP_USERS).map(([email, u]) => ({
+  id:          u.id,
+  name:        u.name,
+  email:       email,
+  role:        u.role as Profile['role'],
+  squad:       u.squad,
+  property_id: null,
+  phone:       null,
+  is_active:   true,
+  created_at:  '2026-01-01T00:00:00Z',
+  updated_at:  null,
+}))
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Profile = {
