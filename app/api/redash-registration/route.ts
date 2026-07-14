@@ -1,6 +1,7 @@
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_SERVICE_HEADERS, REDASH_REG_URL, REDASH_FEED_URL, ADMIN_ID, SUJAL_ID } from '@/lib/config'
 import { NextResponse } from 'next/server'
 
-const URL = 'https://redash.vistarooms.com/api/queries/847/results.csv?api_key=wB001NJMVA6OphBjPx39ktwoiihkiKwsksYF4eQC'
+const URL = REDASH_REG_URL
 
 export async function GET() {
   try {

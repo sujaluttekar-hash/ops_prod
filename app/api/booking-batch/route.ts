@@ -1,38 +1,12 @@
+import { getRedashData, parseRedashCSV } from '@/lib/redash-cache'
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_SERVICE_HEADERS, REDASH_REG_URL, REDASH_FEED_URL, ADMIN_ID, SUJAL_ID } from '@/lib/config'
 import { NextResponse } from 'next/server'
 
-const REG_URL  = 'https://redash.vistarooms.com/api/queries/847/results.csv?api_key=wB001NJMVA6OphBjPx39ktwoiihkiKwsksYF4eQC'
-const FEED_URL = 'https://redash.vistarooms.com/api/queries/849/results.csv?api_key=im0PtIJYIygAazC7CyDNdkMCRxd2c9fxrRavG9v7'
 
-let cache: { reg: Map<string,any>; feed: Map<string,any>; ts: number } | null = null
-const TTL = 5 * 60 * 1000
 
-function parseCSV(csv: string): Record<string,string>[] {
-  const lines = csv.trim().split('\n')
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''))
-  return lines.slice(1).map(line => {
-    const vals: string[] = []; let cur = '', inQ = false
-    for (const ch of line) {
-      if (ch === '"') { inQ = !inQ; continue }
-      if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; continue }
-      cur += ch
-    }
-    vals.push(cur.trim())
-    const obj: Record<string,string> = {}
-    headers.forEach((h,i) => { obj[h] = (vals[i]||'').trim() })
-    return obj
-  })
-}
 
-async function getMaps() {
-  if (cache && Date.now() - cache.ts < TTL) return cache
-  const [rr, fr] = await Promise.all([fetch(REG_URL), fetch(FEED_URL)])
-  const [rc, fc] = await Promise.all([rr.text(), fr.text()])
-  const reg = new Map(parseCSV(rc).map(r => [r.booking_id, r]))
-  const feed = new Map(parseCSV(fc).map(f => [f.booking_id, f]))
-  cache = { reg, feed, ts: Date.now() }
-  return cache
-}
+
+
 
 export async function POST(req: Request) {
   const { booking_ids } = await req.json()
@@ -40,7 +14,9 @@ export async function POST(req: Request) {
     return NextResponse.json({})
 
   try {
-    const { reg, feed } = await getMaps()
+    const { reg: regRaw, feed: feedRaw } = await getRedashData()
+  const reg = new Map(regRaw.map((r:any) => [r.booking_id, r]))
+  const feed = new Map(feedRaw.map((f:any) => [f.booking_id, f]))
     const result: Record<string, any> = {}
 
     for (const id of booking_ids) {

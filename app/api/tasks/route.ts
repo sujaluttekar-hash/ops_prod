@@ -1,8 +1,9 @@
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_SERVICE_HEADERS, REDASH_REG_URL, REDASH_FEED_URL, ADMIN_ID, SUJAL_ID } from '@/lib/config'
 import { NextResponse } from 'next/server'
 
-const SURL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
-const SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
-const H = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}` }
+// SURL → imported as SUPABASE_URL from config
+// SUPABASE_SERVICE_KEY → imported as SUPABASE_SERVICE_KEY from config
+// H → use SUPABASE_SERVICE_HEADERS from config` }
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -12,8 +13,8 @@ export async function GET(req: Request) {
 
   // Fetch all tasks via REST API (server-side — guaranteed service key access)
   const res = await fetch(
-    `${SURL}/rest/v1/tasks?select=id,type,status,butler_id,notes,due_time,geo_lat,geo_lng,photo_path,completed_at&order=created_at.desc`,
-    { headers: H, cache: 'no-store' }
+    `${SUPABASE_URL}/rest/v1/tasks?select=id,type,status,butler_id,notes,due_time,geo_lat,geo_lng,photo_path,completed_at&order=created_at.desc`,
+    { headers: SUPABASE_SERVICE_HEADERS, cache: 'no-store' }
   )
   const tasks = await res.json()
 

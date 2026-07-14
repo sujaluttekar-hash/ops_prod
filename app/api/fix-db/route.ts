@@ -1,12 +1,13 @@
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_SERVICE_HEADERS, REDASH_REG_URL, REDASH_FEED_URL, ADMIN_ID, SUJAL_ID } from '@/lib/config'
 import { NextResponse } from 'next/server'
 
-const SURL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
-const SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
-const H = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}`, 'Content-Type': 'application/json' }
+// SURL → imported as SUPABASE_URL from config
+// SUPABASE_SERVICE_KEY → imported as SUPABASE_SERVICE_KEY from config
+// H → use SUPABASE_SERVICE_HEADERS from config`, 'Content-Type': 'application/json' }
 
 export async function GET() {
   // Test inserting with 'pending' status
-  const test = await fetch(`${SURL}/rest/v1/guest_delights?select=id,status&limit=1`, { headers: H })
+  const test = await fetch(`${SUPABASE_URL}/rest/v1/guest_delights?select=id,status&limit=1`, { headers: SUPABASE_SERVICE_HEADERS })
   const testData = await test.json()
   
   return NextResponse.json({

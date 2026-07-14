@@ -1,8 +1,9 @@
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_SERVICE_HEADERS, REDASH_REG_URL, REDASH_FEED_URL, ADMIN_ID, SUJAL_ID } from '@/lib/config'
 import { NextResponse } from 'next/server'
 
-const SURL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
-const SVC  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
-const H    = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}`, 'Content-Type': 'application/json' }
+// SURL → imported as SUPABASE_URL from config
+// SUPABASE_SERVICE_KEY → imported as SUPABASE_SERVICE_KEY from config
+// H → use SUPABASE_SERVICE_HEADERS from config`, 'Content-Type': 'application/json' }
 
 // POST — butler saves their location
 export async function POST(req: Request) {
@@ -12,10 +13,10 @@ export async function POST(req: Request) {
 
   // Upsert by butler_id using on_conflict
   const res = await fetch(
-    `${SURL}/rest/v1/butler_locations`,
+    `${SUPABASE_URL}/rest/v1/butler_locations`,
     {
       method: 'POST',
-      headers: { ...H, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      headers: { ...SUPABASE_SERVICE_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ butler_id, butler_name, squad, lat, lng, accuracy, updated_at: new Date().toISOString() }),
     }
   )
@@ -31,8 +32,8 @@ export async function POST(req: Request) {
 // GET — fetch all live butler locations
 export async function GET() {
   const res = await fetch(
-    `${SURL}/rest/v1/butler_locations?select=*&order=updated_at.desc`,
-    { headers: H, cache: 'no-store' }
+    `${SUPABASE_URL}/rest/v1/butler_locations?select=*&order=updated_at.desc`,
+    { headers: SUPABASE_SERVICE_HEADERS, cache: 'no-store' }
   )
   if (!res.ok) return NextResponse.json([])
   const data = await res.json()

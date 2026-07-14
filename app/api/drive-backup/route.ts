@@ -1,8 +1,9 @@
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_SERVICE_HEADERS, REDASH_REG_URL, REDASH_FEED_URL, ADMIN_ID, SUJAL_ID } from '@/lib/config'
 import { NextResponse } from 'next/server'
 
-const SURL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
-const SVC  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
-const SH   = { 'apikey': SVC, 'Authorization': `Bearer ${SVC}` }
+// SURL → imported as SUPABASE_URL from config
+// SUPABASE_SERVICE_KEY → imported as SUPABASE_SERVICE_KEY from config
+// SH → use SUPABASE_SERVICE_HEADERS from config` }
 
 // Drive folder IDs (already created)
 const DRIVE_DELIGHT = '1ExnORyWbMXz9rGKA7vX7tECCVRizqMp_'
@@ -39,11 +40,11 @@ async function uploadToDrive(name: string, imageBuffer: ArrayBuffer, mimeType: s
 // ── GET: return folder links + backup status ─────────────────
 export async function GET() {
   // Fetch count of photos in DB
-  const photosRes = await fetch(`${SURL}/rest/v1/delight_photos?select=id,public_url&limit=200`, { headers: SH })
+  const photosRes = await fetch(`${SUPABASE_URL}/rest/v1/delight_photos?select=id,public_url&limit=200`, { headers: SUPABASE_SERVICE_HEADERS })
   const photos = await photosRes.json()
   const withUrl = Array.isArray(photos) ? photos.filter((p: any) => p.public_url) : []
 
-  const tasksRes = await fetch(`${SURL}/rest/v1/tasks?select=id,photo_path&not.photo_path=is.null&limit=200`, { headers: SH })
+  const tasksRes = await fetch(`${SUPABASE_URL}/rest/v1/tasks?select=id,photo_path&not.photo_path=is.null&limit=200`, { headers: SUPABASE_SERVICE_HEADERS })
   const tasks = await tasksRes.json()
   const withPhoto = Array.isArray(tasks) ? tasks.filter((t: any) => t.photo_path) : []
 

@@ -1,31 +1,15 @@
 import { NextResponse } from 'next/server'
+import { getRedashData, parseRedashCSV } from '@/lib/redash-cache'
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_SERVICE_HEADERS, REDASH_REG_URL, REDASH_FEED_URL, ADMIN_ID, SUJAL_ID } from '@/lib/config'
 import { createClient } from '@supabase/supabase-js'
 
-const REG_URL  = 'https://redash.vistarooms.com/api/queries/847/results.csv?api_key=wB001NJMVA6OphBjPx39ktwoiihkiKwsksYF4eQC'
-const FEED_URL = 'https://redash.vistarooms.com/api/queries/849/results.csv?api_key=im0PtIJYIygAazC7CyDNdkMCRxd2c9fxrRavG9v7'
-const SURL = 'https://ryuxwnbrdsjwzwdimynd.supabase.co'
-const SVC  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5dXh3bmJyZHNqd3p3ZGlteW5kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM5OTE1OCwiZXhwIjoyMDk1OTc1MTU4fQ.oMKEwSjxX8JodtjuhKcA_UhzTKoASAdYeOhf-azkEgA'
+const REG_URL  = REDASH_REG_URL
+const FEED_URL = REDASH_FEED_URL
+// SURL → imported as SUPABASE_URL from config
+// SUPABASE_SERVICE_KEY → imported as SUPABASE_SERVICE_KEY from config
 
-let cache: { reg: any[]; feed: any[]; ts: number } | null = null
-const TTL = 5 * 60 * 1000
 
-function parseCSV(csv: string): Record<string,string>[] {
-  const lines = csv.trim().split('\n')
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''))
-  return lines.slice(1).map(line => {
-    const vals: string[] = []; let cur = '', inQ = false
-    for (const ch of line) {
-      if (ch === '"') { inQ = !inQ; continue }
-      if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; continue }
-      cur += ch
-    }
-    vals.push(cur.trim())
-    const obj: Record<string,string> = {}
-    headers.forEach((h,i) => { obj[h] = (vals[i]||'').trim() })
-    return obj
-  })
-}
+
 
 function parseDate(s: string): Date | null {
   if (!s || s === 'NA') return null
@@ -37,13 +21,7 @@ function parseDate(s: string): Date | null {
   return new Date(parseInt(parts[2]), month, parseInt(parts[0]))
 }
 
-async function getRedashData() {
-  if (cache && Date.now() - cache.ts < TTL) return cache
-  const [rr, fr] = await Promise.all([fetch(REG_URL), fetch(FEED_URL)])
-  const [rc, fc] = await Promise.all([rr.text(), fr.text()])
-  cache = { reg: parseCSV(rc), feed: parseCSV(fc), ts: Date.now() }
-  return cache
-}
+
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -59,7 +37,7 @@ export async function GET(req: Request) {
 
   try {
     // 1. Get all butlers
-    const sb = createClient(SURL, SVC)
+    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     const { data: butlers } = await sb.from('profiles').select('id,name,squad').eq('role','butler').eq('is_active',true).order('name')
     if (!butlers?.length) return NextResponse.json({ results: {} })
 
