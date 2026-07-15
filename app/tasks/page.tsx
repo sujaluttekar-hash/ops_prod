@@ -686,6 +686,10 @@ export default function TasksPage() {
                     const villaName = villaMatch
                       ? villaMatch[1].trim()
                       : (!hasButlerPrefix && t.notes && t.notes.trim() ? t.notes.split(' · ')[0].trim() : '—');
+                    // Extract butler's comment for Non Booking tasks
+                    const commentMatch = t.notes?.match(/Comment: ([^·]+)/);
+                    const taskNote = commentMatch ? commentMatch[1].trim() : null;
+                    const isNonBooking = t.type === 'Non Booking';
                     return (
                       <tr key={t.id}>
                         <td>
@@ -714,7 +718,17 @@ export default function TasksPage() {
                             </div>
                           </td>
                         )}
-                        <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{villaName}</td>
+                        <td style={{ fontSize: 13 }}>
+                          <div style={{ color: 'var(--muted-fg)' }}>{villaName}</div>
+                          {isNonBooking && taskNote && (
+                            <div style={{ fontSize: 11, color: '#0C447C', marginTop: 3, background: 'rgba(156,204,252,0.1)', padding: '3px 8px', borderRadius: 6, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              💬 {taskNote}
+                            </div>
+                          )}
+                          {isNonBooking && !taskNote && t.status === 'pending' && (
+                            <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2 }}>No comment yet</div>
+                          )}
+                        </td>
                         <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{t.due_time ?? '—'}</td>
                         <td><span className={getStatusBadge(t.status)}>{getStatusLabel(t.status)}</span></td>
                         <td>
