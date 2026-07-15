@@ -414,6 +414,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
     booking_id: editEntry?.booking_id || '',
     villa_name: editEntry?.villa_name || '',
     booking_type: editEntry?.booking_type || '',
+    task_comment: editEntry?.notes || '',
   });
   const [photos, setPhotos] = useState<Record<string, PhotoVal>>(Object.fromEntries(CATEGORIES.map(c => [c.key, null])));
   const [videos, setVideos] = useState<Record<string, VideoVal>>(Object.fromEntries(CATEGORIES.map(c => [c.key, null])));
@@ -439,6 +440,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
 
   async function handleSave() {
     if (!form.booking_id && form.booking_type !== 'Non Booking Task') { setError('Booking ID is required for this task type'); return; }
+    if (form.booking_type === 'Non Booking Task' && !form.task_comment?.trim()) { setError('Please describe what was done for this non-booking task'); return; }
     // villa_name is set either from VillaSearch selection or from booking auto-fill
     if (!form.villa_name) { setError('Villa is required — it auto-fills when you select a booking'); return; }
     if (!form.booking_date) { setError('Please set a booking date'); return; }
@@ -454,7 +456,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         const { data, error: insertErr } = await sb.from('guest_delights').insert({
           your_name: form.your_name, squad: form.squad, booking_date: form.booking_date,
           booking_id: form.booking_id || null, villa_name: form.villa_name,
-          booking_type: form.booking_type, status: 'pending',
+          booking_type: form.booking_type, notes: form.task_comment || null, status: 'pending',
         }).select().single();
         if (insertErr) throw new Error(insertErr.message);
         entryId = data.id;
@@ -598,6 +600,22 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
           </div>
         </div>
 
+        {/* Comment field — mandatory for Non Booking Task */}
+        {form.booking_type === 'Non Booking Task' && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
+              What was done <span style={{ color: '#E93C3C' }}>*</span>
+            </div>
+            <textarea
+              className="sv-input"
+              style={{ width: '100%', minHeight: 72, resize: 'vertical' }}
+              placeholder="Describe the non-booking task completed — e.g. cleaned pool area, fixed garden lighting, restocked minibar…"
+              value={form.task_comment || ''}
+              onChange={e => setForm(p => ({ ...p, task_comment: e.target.value }))}
+            />
+          </div>
+        )}
+
         {/* 7 category cards */}
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>
           Photo categories · {uploadedCount}/{CATEGORIES.length} uploaded
@@ -670,6 +688,11 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
           <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
             {entry.your_name}{entry.squad ? ` · ${entry.squad}` : ''} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}{entry.booking_id ? ` · #${entry.booking_id}` : ''}
           </div>
+          {entry.booking_type === 'Non Booking Task' && entry.notes && (
+            <div style={{ fontSize: 11, marginTop: 5, padding: '5px 10px', background: 'rgba(156,204,252,0.1)', border: '1px solid rgba(156,204,252,0.3)', borderRadius: 7, color: '#0C447C' }}>
+              💬 {entry.notes}
+            </div>
+          )}
           {entry.booking_id && bookingInfo && (
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
               {bookingInfo.found === false ? (
