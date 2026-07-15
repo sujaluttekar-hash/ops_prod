@@ -394,6 +394,25 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
               </div>
             )}
 
+            {/* Comment — mandatory for Non Booking tasks */}
+            {needsComment && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
+                  What was done <span style={{ color: '#E93C3C' }}>*</span>
+                </div>
+                <textarea
+                  className="sv-input"
+                  value={taskComment}
+                  onChange={e => setTaskComment(e.target.value)}
+                  placeholder="Describe the non-booking task you completed…"
+                  style={{ width: '100%', minHeight: 80, resize: 'vertical' }}
+                />
+                {submitError && submitError.includes('describe') && (
+                  <div style={{ fontSize: 11, color: '#E93C3C', marginTop: 4 }}>{submitError}</div>
+                )}
+              </div>
+            )}
+
             {/* Notes */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Notes (optional)</div>
