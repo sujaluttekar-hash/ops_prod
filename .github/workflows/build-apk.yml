@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -41,11 +44,10 @@ jobs:
       - name: Build debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
-        run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk SV-Butler.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk SV-Butler.apk
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
@@ -64,13 +66,12 @@ jobs:
 
             ### How to install:
             1. Download **SV-Butler.apk** below
-            2. Send it to your butlers via WhatsApp
-            3. On their Android phone — tap the file
-            4. If asked, tap **"Install anyway"** or enable unknown sources in settings
-            5. App installs with "SV Butler" icon on home screen
+            2. Send to butlers via WhatsApp
+            3. Tap the file on their Android phone
+            4. If blocked — Settings → Security → Allow unknown sources
+            5. Tap Install → Done
 
-            ---
-            Built from commit ${{ github.sha }}
+            Built from commit: ${{ github.sha }}
           files: SV-Butler.apk
           make_latest: true
         env:

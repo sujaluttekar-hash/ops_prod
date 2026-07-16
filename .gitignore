@@ -32,4 +32,3 @@ next-env.d.ts
 # Capacitor build artifacts (keep source, ignore build output)
 android/app/build/
 android/.gradle/
-android/capacitor-cordova-android-plugins/
