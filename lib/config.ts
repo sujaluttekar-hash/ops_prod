@@ -66,6 +66,7 @@ export const APP_USERS: Record<string, {
 }> = {
   'admin@stayvista.com':         { id: 'd035c01f-6987-4e76-8ab7-a562235ed2c8', password: 'StayVista@2026', role: 'super_admin', name: 'Aditi',           squad: 'All'      },
   'sujal@stayvista.com':         { id: '8d5da751-3269-4d77-b837-45253a9435c5', password: 'sujal@123',      role: 'ops_manager', name: 'Sujal',           squad: 'All'      },
+  'svops@stayvista.com':         { id: '74d52090-9c35-4e4f-98d5-d75b49f35bec', password: 'Svops@2026',      role: 'ops_manager', name: 'Svops',           squad: 'All'      },
   'sujal.uttekar@stayvista.com': { id: 'd71e6f0f-916d-4fec-af8d-d14113f70ae4', password: 'StayVista@2026', role: 'butler',      name: 'Sujal Uttekar',   squad: null       },
   'arbaz@stayvista.com':         { id: 'bfdbc167-f99e-40d0-80fc-ba25dc85cc36', password: 'arbaz@123',      role: 'butler',      name: 'Arbaz',           squad: 'Karjat'   },
   'atish@stayvista.com':         { id: 'fedb395e-476c-43d7-a76f-c87f8e508856', password: 'atish@123',      role: 'butler',      name: 'Atish Tandkar',   squad: 'Nashik'   },
