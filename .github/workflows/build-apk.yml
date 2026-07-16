@@ -3,7 +3,10 @@ name: Build Android APK
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # allows manual trigger from GitHub UI
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -40,34 +43,35 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Rename APK
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk SV-Butler.apk
+
+      - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SV-Butler-v1.0.apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+          name: SV-Butler-Android
+          path: SV-Butler.apk
+          retention-days: 90
 
-      - name: Create Release
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: SV Butler v1.0.${{ github.run_number }}
+          tag_name: apk-v1.0.${{ github.run_number }}
+          name: "SV Butler App v1.0.${{ github.run_number }}"
           body: |
-            ## SV Butler Android App
-            
-            ### Install on Android:
-            1. Download `SV-Butler.apk` below
-            2. Send to butlers via WhatsApp
-            3. Tap to install (allow "Install from unknown sources" if prompted)
-            
-            ### What's included:
-            - All butler features: Task, Delight, Attendance, Cases, Map
-            - Admin features: MIS Dashboard, Performance, Credentials
-            - Loads live app from ops-prod.vercel.app
-            - Updates automatically when app is updated
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          draft: false
-          prerelease: false
+            ## 📱 SV Butler Android App
+
+            ### How to install:
+            1. Download **SV-Butler.apk** below
+            2. Send it to your butlers via WhatsApp
+            3. On their Android phone — tap the file
+            4. If asked, tap **"Install anyway"** or enable unknown sources in settings
+            5. App installs with "SV Butler" icon on home screen
+
+            ---
+            Built from commit ${{ github.sha }}
+          files: SV-Butler.apk
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
