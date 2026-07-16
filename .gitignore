@@ -25,3 +25,11 @@ yarn-error.log*
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# Keep these for Capacitor APK build
+!www/
+!android/
+# Capacitor build artifacts (keep source, ignore build output)
+android/app/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SV Butler</string>
+    <string name="title_activity_main">SV Butler</string>
+    <string name="package_name">com.stayvista.butlerops</string>
+    <string name="custom_url_scheme">com.stayvista.butlerops</string>
+</resources>
