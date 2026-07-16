@@ -69,13 +69,15 @@ export const APP_USERS: Record<string, {
   'sujal.uttekar@stayvista.com': { id: 'd71e6f0f-916d-4fec-af8d-d14113f70ae4', password: 'StayVista@2026', role: 'butler',      name: 'Sujal Uttekar',   squad: null       },
   'arbaz@stayvista.com':         { id: 'bfdbc167-f99e-40d0-80fc-ba25dc85cc36', password: 'arbaz@123',      role: 'butler',      name: 'Arbaz',           squad: 'Karjat'   },
   'atish@stayvista.com':         { id: 'fedb395e-476c-43d7-a76f-c87f8e508856', password: 'atish@123',      role: 'butler',      name: 'Atish Tandkar',   squad: 'Nashik'   },
-  'kalpesh@stayvista.com':       { id: '30ebc89e-17fc-43db-b9a8-46398d24a1e3', password: 'kalpesh@123',    role: 'butler',      name: 'Kalpesh Ther',    squad: 'Alibaug'  },
-  'kohinoor@stayvista.com':      { id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', password: 'kohinoor@123',   role: 'butler',      name: 'Kohinoor Shinde', squad: 'Karjat'   },
-  'manoj@stayvista.com':         { id: '24e03c68-5cd0-47aa-a695-75850ac2a81d', password: 'manoj@123',      role: 'butler',      name: 'Manoj Valmiki',   squad: 'Lonavala' },
-  'nimish@stayvista.com':        { id: '326c84fa-7c94-42a4-b7a2-6545f1398308', password: 'nimish@123',     role: 'butler',      name: 'Nimish',          squad: 'Alibaug'  },
+  'kalpesh@stayvista.com':       { id: '30ebc89e-17fc-43db-b9a8-46398d24a1e3', password: 'kalpesh@123',    role: 'butler',      name: 'Kalpesh Ther',    squad: 'Karjat'   },
+  'kohinoor@stayvista.com':      { id: 'f3ad17de-169d-4832-93e9-6f3a1b30b1e2', password: 'kohinoor@123',   role: 'butler',      name: 'Kohinoor Shinde', squad: 'Lonavala' },
+  'manoj@stayvista.com':         { id: '24e03c68-5cd0-47aa-a695-75850ac2a81d', password: 'manoj@123',      role: 'butler',      name: 'Manoj Valmiki',   squad: 'Alibaug'  },
+  'nimish@stayvista.com':        { id: '326c84fa-7c94-42a4-b7a2-6545f1398308', password: 'nimish@123',     role: 'butler',      name: 'Nimish',          squad: 'Karjat'   },
   'butler@stayvista.com':        { id: '0835f144-513d-4107-968f-bb0c3ddbd6df', password: 'butler@123',     role: 'butler',      name: 'Ravi Kumar',      squad: 'Lonavala' },
   'vinayak@stayvista.com':       { id: '4b2cc4e7-876b-490a-a315-192c67424328', password: 'vinayak@123',    role: 'butler',      name: 'Vinayak Kharade', squad: 'Lonavala' },
-  'vishal@stayvista.com':        { id: '4ab59e13-1d68-4607-bef8-b9fb013827ac', password: 'vishal@123',     role: 'butler',      name: 'Vishal',          squad: 'Karjat'   },
+  'arbaj@stayvista.com':         { id: 'f0b06e94-fbb1-44b8-be9c-25edbbac5afb', password: 'arbaj@123',      role: 'butler',      name: 'Arbaj Shaikh',    squad: 'Karjat'   },
+  'abhishek@stayvista.com':      { id: 'b42efa8e-bcab-4fe2-8cb9-db9fce5a0f24', password: 'abhishek@123',   role: 'butler',      name: 'Abhishek',        squad: 'Alibaug'  },
+  'vishal@stayvista.com':        { id: '4ab59e13-1d68-4607-bef8-b9fb013827ac', password: 'vishal@123',     role: 'butler',      name: 'Vishal',          squad: 'Alibaug'  },
 }
 
 // Admin UUIDs — for system notifications
