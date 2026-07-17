@@ -213,7 +213,15 @@ export default function DashboardPage() {
   const now = new Date()
   const [selMonth, setSelMonth] = useState(now.getMonth()) // 0-11
   const [selYear, setSelYear] = useState(now.getFullYear())
-  const [selButler, setSelButler] = useState('All')
+  // Butlers default to seeing only their own activity; admins/supervisors see All
+  const [selButler, setSelButler] = useState(() => {
+    try {
+      const s = typeof window !== 'undefined' ? localStorage.getItem('sv_local_session') : null
+      if (!s) return 'All'
+      const u = JSON.parse(s)
+      return u.role === 'butler' ? (u.name || 'All') : 'All'
+    } catch { return 'All' }
+  })
   const [selVilla, setSelVilla] = useState('All')
   const [selType, setSelType] = useState<'tasks' | 'delights' | 'all'>('all')
 
