@@ -870,12 +870,27 @@ export default function DelightPage() {
       if (!isSuper) delightQ = delightQ.eq('your_name', localUser.name || '');
       const { data: delights } = await delightQ;
 
-      const { data: allPhotos } = await sb.from('delight_photos')
-        .select('id,delight_id,pointer_key,public_url,storage_path,photo_status,video_url');
+      // Fetch photos only for the delights we loaded — filter by delight IDs
+      // Use * to avoid breaking if video_url or other columns don't exist yet
+      const delightIds = (delights || []).map((d: any) => d.id).filter(Boolean);
+      let allPhotos: any[] = [];
+      if (delightIds.length > 0) {
+        // Fetch in batches of 100 to avoid URL length limits
+        const batchSize = 100;
+        for (let i = 0; i < delightIds.length; i += batchSize) {
+          const batch = delightIds.slice(i, i + batchSize);
+          const { data: batchPhotos, error: photoErr } = await sb
+            .from('delight_photos')
+            .select('*')
+            .in('delight_id', batch);
+          if (photoErr) console.error('Photo fetch error:', photoErr.message);
+          if (batchPhotos) allPhotos = allPhotos.concat(batchPhotos);
+        }
+      }
 
       // Merge photos into their delight entries
       const photosMap: Record<string, any[]> = {};
-      (allPhotos || []).forEach((p: any) => {
+      allPhotos.forEach((p: any) => {
         if (!photosMap[p.delight_id]) photosMap[p.delight_id] = [];
         photosMap[p.delight_id].push(p);
       });

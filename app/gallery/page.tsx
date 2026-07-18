@@ -46,7 +46,7 @@ export default function GalleryPage() {
     const sb = getServiceSupabase();
     const [dR, pR] = await Promise.all([
       sb.from('guest_delights').select('id,your_name,villa_name,booking_id,booking_date,booking_type,squad,status,created_at').order('created_at', { ascending: false }),
-      sb.from('delight_photos').select('id,delight_id,pointer_key,public_url,photo_status,uploaded_at'),
+      sb.from('delight_photos').select('*'),
     ]);
     setEntries(dR.data || []);
     setPhotos(pR.data || []);
