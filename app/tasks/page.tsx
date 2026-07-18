@@ -259,14 +259,17 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
         notes || '',
       ].filter(Boolean);
 
-      // Save task as completed — GPS runs after, non-blocking
-      const { error } = await getServiceSupabase().from('tasks').update({
+      // Save task as completed — build update object safely
+      const updatePayload: Record<string, any> = {
         status: 'completed',
         completed_at: new Date().toISOString(),
         notes: noteParts.join(' · ') || null,
-        photo_path: photo_url || task.photo_path || null,
-        voice_url: video_url || undefined,
-      }).eq('id', task.id);
+        photo_path: photo_url || (task as any).photo_path || null,
+      };
+      // Only add voice_url if we have a value (column may not exist — catch error)
+      if (video_url) updatePayload.voice_url = video_url;
+
+      const { error } = await getServiceSupabase().from('tasks').update(updatePayload).eq('id', task.id);
 
       if (error) {
         setSubmitError('Failed to save: ' + error.message);
