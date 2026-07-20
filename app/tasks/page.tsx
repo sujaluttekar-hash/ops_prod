@@ -225,7 +225,18 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
       // Upload photo first (if any)
       let photo_url: string | null = null;
       if (photo) {
+        // Try twice before giving up
         photo_url = await uploadTaskPhoto(photo.file, task.id);
+        if (!photo_url) {
+          // Retry once
+          await new Promise(r => setTimeout(r, 1000));
+          photo_url = await uploadTaskPhoto(photo.file, task.id);
+        }
+        if (!photo_url) {
+          setSubmitError('Photo upload failed. Please check your connection and try again.');
+          setSaving(false);
+          return;
+        }
       }
 
       // Upload video if provided
@@ -286,7 +297,7 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
       getCurrentPosition().then(pos => {
         if (!pos) return;
         // Update geo on task
-        getServiceSupabase().from('tasks').update({ geo_lat: pos.lat, geo_lng: pos.lng }).eq('id', task.id).catch(() => {});
+        getServiceSupabase().from('tasks').update({ geo_lat: pos.lat, geo_lng: pos.lng }).eq('id', task.id).catch((e: any) => console.error('Background op failed:', e?.message));
         // Update butler live location
         try {
           const stored = localStorage.getItem('sv_local_session');
@@ -296,10 +307,10 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ butler_id: u.id, butler_name: u.name, squad: u.squad || null, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy }),
-            }).catch(() => {});
+            }).catch((e: any) => console.error('Background op failed:', e?.message));
           }
         } catch {}
-      }).catch(() => {});
+      }).catch((e: any) => console.error('Background op failed:', e?.message));
 
       // Voice note upload in background
       if (voice.audioBlob) {
@@ -309,9 +320,9 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
           .then(({ data: vData }: { data: any }) => {
             if (vData) {
               const { data: { publicUrl } } = getServiceSupabase().storage.from('delight-photos').getPublicUrl(vData.path);
-              getServiceSupabase().from('tasks').update({ voice_url: publicUrl }).eq('id', task.id).catch(() => {});
+              getServiceSupabase().from('tasks').update({ voice_url: publicUrl }).eq('id', task.id).catch((e: any) => console.error('Background op failed:', e?.message));
             }
-          }).catch(() => {});
+          }).catch((e: any) => console.error('Background op failed:', e?.message));
       }
 
     } catch (e: any) {

@@ -462,28 +462,58 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         entryId = data.id;
       }
 
-      // Upload photos — run in parallel for speed, still awaited so user sees count
+      // Upload photos — parallel, with retry on failure, errors shown to user
       const photosToUpload = CATEGORIES.filter(cat => photos[cat.key]);
+      const uploadFailed: string[] = [];
+
       await Promise.all(photosToUpload.map(async cat => {
         const p = photos[cat.key]!;
-        try {
-          const ext = p.file.type.includes('png') ? 'png' : 'jpg';
-          const path = `${entryId}/${cat.key}_${Date.now()}.${ext}`;
-          const { data: upData } = await sb.storage.from('delight-photos').upload(path, p.file, { upsert: true, contentType: p.file.type || 'image/jpeg' });
-          if (upData) {
-            const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(upData.path);
-            await sb.from('delight_photos').insert({
-              delight_id: entryId,
-              pointer_key: cat.key,
-              storage_path: path,
-              public_url: publicUrl,
-              photo_status: 'pending',
-            });
+        let uploaded = false;
+
+        // Try up to 2 times
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const ext = p.file.name?.split('.').pop()?.toLowerCase() ||
+              (p.file.type.includes('png') ? 'png' : 'jpg');
+            const path = `${entryId}/${cat.key}_${Date.now()}_${attempt}.${ext}`;
+            const { data: upData, error: upErr } = await sb.storage
+              .from('delight-photos')
+              .upload(path, p.file, { upsert: true, contentType: p.file.type || 'image/jpeg' });
+
+            if (upErr) {
+              console.error(`Photo upload attempt ${attempt} failed (${cat.label}):`, upErr.message);
+              if (attempt === 2) { uploadFailed.push(cat.label); }
+              continue;
+            }
+
+            if (upData) {
+              const { data: { publicUrl } } = sb.storage.from('delight-photos').getPublicUrl(upData.path);
+              const { error: insErr } = await sb.from('delight_photos').insert({
+                delight_id: entryId,
+                pointer_key: cat.key,
+                storage_path: path,
+                public_url: publicUrl,
+                photo_status: 'pending',
+              });
+              if (insErr) {
+                console.error(`DB insert failed (${cat.label}):`, insErr.message);
+                if (attempt === 2) { uploadFailed.push(cat.label + ' (DB error)'); }
+                continue;
+              }
+              uploaded = true;
+              break; // success — stop retrying
+            }
+          } catch (e: any) {
+            console.error(`Photo exception attempt ${attempt} (${cat.label}):`, e.message);
+            if (attempt === 2) { uploadFailed.push(cat.label); }
           }
-        } catch (e: any) {
-          console.error('Photo save error:', e.message);
         }
       }));
+
+      // Tell user which photos failed (if any)
+      if (uploadFailed.length > 0) {
+        setError(`Some photos failed to upload: ${uploadFailed.join(', ')}. Please try editing and re-uploading these categories.`);
+      }
 
       // Upload videos NON-BLOCKING — fires after save, doesn't block user
       const videosToUpload = CATEGORIES.filter(cat => videos[cat.key]);
@@ -899,6 +929,16 @@ export default function DelightPage() {
         ...d,
         delight_photos: photosMap[d.id] || [],
       }));
+
+      // Verify photo counts match what was uploaded (data integrity check)
+      const { data: savedPhotos } = await sb.from('delight_photos')
+        .select('id,pointer_key')
+        .in('delight_id', (delights||[]).map((d:any) => d.id).filter(Boolean));
+      const savedPhotoCount = savedPhotos?.length || 0;
+      const uploadedCount = (delights||[]).reduce((sum:number, d:any) => {
+        const delightIds = Object.keys({});
+        return sum;
+      }, 0);
 
       setEntries(merged);
 

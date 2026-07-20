@@ -287,7 +287,22 @@ export async function submitQuizAttempt(payload: any) {
 
 export async function uploadPhoto(bucket: string, file: File, path: string) {
   try {
-    const { data, error } = await getServiceSupabase().storage.from(bucket).upload(path, file, { upsert: true })
+    // Validate file before uploading
+    if (!file || file.size === 0) {
+      return { error: new Error('File is empty or invalid'), publicUrl: null }
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      return { error: new Error(`File too large: ${(file.size/1024/1024).toFixed(1)}MB (max 50MB)`), publicUrl: null }
+    }
+    // Detect content type properly
+    const contentType = file.type || (
+      file.name?.endsWith('.png') ? 'image/png' :
+      file.name?.endsWith('.jpg') || file.name?.endsWith('.jpeg') ? 'image/jpeg' :
+      file.name?.endsWith('.heic') ? 'image/heic' :
+      'image/jpeg'
+    )
+    const { data, error } = await getServiceSupabase().storage
+      .from(bucket).upload(path, file, { upsert: true, contentType })
     if (error) return { error, publicUrl: null }
     const { data: { publicUrl } } = getServiceSupabase().storage.from(bucket).getPublicUrl(data.path)
     return { error: null, publicUrl }
