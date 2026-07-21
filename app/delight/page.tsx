@@ -440,7 +440,7 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
 
   async function handleSave() {
     if (!form.booking_id && form.booking_type !== 'Non Booking Task') { setError('Booking ID is required for this task type'); return; }
-    if (form.booking_type === 'Non Booking Task' && !form.task_comment?.trim()) { setError('Please describe what was done for this non-booking task'); return; }
+    if (form.booking_type === 'Non Booking Task' && !form.task_comment?.trim()) { setError('Please describe what was done for this non-booking task.'); return; }
     // villa_name is set either from VillaSearch selection or from booking auto-fill
     if (!form.villa_name) { setError('Villa is required — it auto-fills when you select a booking'); return; }
     if (!form.booking_date) { setError('Please set a booking date'); return; }
@@ -630,16 +630,18 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
           </div>
         </div>
 
-        {/* Comment field — mandatory for Non Booking Task */}
-        {form.booking_type === 'Non Booking Task' && (
+        {/* Comment field — available for all booking types */}
+        {form.booking_type && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 }}>
-              What was done <span style={{ color: '#E93C3C' }}>*</span>
+              {form.booking_type === 'Non Booking Task'
+                ? <span>What was done <span style={{ color: '#E93C3C' }}>*</span></span>
+                : 'Comment (optional)'}
             </div>
             <textarea
               className="sv-input"
               style={{ width: '100%', minHeight: 72, resize: 'vertical' }}
-              placeholder="Describe the non-booking task completed — e.g. cleaned pool area, fixed garden lighting, restocked minibar…"
+              placeholder={form.booking_type === "Non Booking Task" ? "Describe the non-booking task completed…" : "Add any notes about this booking task (optional)…"}
               value={form.task_comment || ''}
               onChange={e => setForm(p => ({ ...p, task_comment: e.target.value }))}
             />
@@ -718,7 +720,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
           <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
             {entry.your_name}{entry.squad ? ` · ${entry.squad}` : ''} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}{entry.booking_id ? ` · #${entry.booking_id}` : ''}
           </div>
-          {entry.booking_type === 'Non Booking Task' && entry.notes && (
+          {entry.notes && (
             <div style={{ fontSize: 11, marginTop: 5, padding: '5px 10px', background: 'rgba(156,204,252,0.1)', border: '1px solid rgba(156,204,252,0.3)', borderRadius: 7, color: '#0C447C' }}>
               💬 {entry.notes}
             </div>

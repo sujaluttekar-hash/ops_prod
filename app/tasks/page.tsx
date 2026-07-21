@@ -12,12 +12,12 @@ import { isSupervisor } from '@/lib/auth';
 // ── Task field matrix ─────────────────────────────────────────
 const BOOKING_REQUIRED_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Check-In','Check-Out','Booking'];
 const TASK_FIELD_MATRIX: Record<string, { bookingId: boolean; arrivalSelfie: boolean; exitSelfie: boolean; guestWelcome: boolean; comment: boolean; video: boolean }> = {
-  'Arrival selfie':  { bookingId: true,  arrivalSelfie: true,  exitSelfie: false, guestWelcome: false, comment: false, video: true  },
-  'Guest welcome':   { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: true,  comment: false, video: true  },
-  'Table layout':    { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: false, video: false },
-  'Exit selfie':     { bookingId: true,  arrivalSelfie: false, exitSelfie: true,  guestWelcome: false, comment: false, video: true  },
-  'Check-In':        { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: true,  comment: false, video: false },
-  'Check-Out':       { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: false, video: false },
+  'Arrival selfie':  { bookingId: true,  arrivalSelfie: true,  exitSelfie: false, guestWelcome: false, comment: true,  video: true  },
+  'Guest welcome':   { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: true,  comment: true,  video: true  },
+  'Table layout':    { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: true,  video: false },
+  'Exit selfie':     { bookingId: true,  arrivalSelfie: false, exitSelfie: true,  guestWelcome: false, comment: true,  video: true  },
+  'Check-In':        { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: true,  comment: true,  video: false },
+  'Check-Out':       { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: true,  video: false },
   'Non Booking':     { bookingId: false, arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: true,  video: false },
 };
 
@@ -71,12 +71,12 @@ function AssignTaskModal({ onClose, onDone }: { onClose: () => void; onDone: () 
 // ── Task field matrix ─────────────────────────────────────────
 const BOOKING_REQUIRED_TYPES = ['Arrival selfie','Guest welcome','Table layout','Exit selfie','Check-In','Check-Out','Booking'];
 const TASK_FIELD_MATRIX: Record<string, { bookingId: boolean; arrivalSelfie: boolean; exitSelfie: boolean; guestWelcome: boolean; comment: boolean; video: boolean }> = {
-  'Arrival selfie':  { bookingId: true,  arrivalSelfie: true,  exitSelfie: false, guestWelcome: false, comment: false, video: true  },
-  'Guest welcome':   { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: true,  comment: false, video: true  },
-  'Table layout':    { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: false, video: false },
-  'Exit selfie':     { bookingId: true,  arrivalSelfie: false, exitSelfie: true,  guestWelcome: false, comment: false, video: true  },
-  'Check-In':        { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: true,  comment: false, video: false },
-  'Check-Out':       { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: false, video: false },
+  'Arrival selfie':  { bookingId: true,  arrivalSelfie: true,  exitSelfie: false, guestWelcome: false, comment: true,  video: true  },
+  'Guest welcome':   { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: true,  comment: true,  video: true  },
+  'Table layout':    { bookingId: true,  arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: true,  video: false },
+  'Exit selfie':     { bookingId: true,  arrivalSelfie: false, exitSelfie: true,  guestWelcome: false, comment: true,  video: true  },
+  'Check-In':        { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: true,  comment: true,  video: false },
+  'Check-Out':       { bookingId: true,  arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: true,  video: false },
   'Non Booking':     { bookingId: false, arrivalSelfie: true,  exitSelfie: true,  guestWelcome: false, comment: true,  video: false },
 };
 
@@ -195,7 +195,7 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
   const [done, setDone] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const videoRef = useRef<HTMLInputElement>(null);
-  const matrix = TASK_FIELD_MATRIX[task.type] || { bookingId: false, arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: false, video: false };
+  const matrix = TASK_FIELD_MATRIX[task.type] || { bookingId: false, arrivalSelfie: false, exitSelfie: false, guestWelcome: false, comment: true, video: false };
   const needsBookingId = matrix.bookingId;
   const needsComment = matrix.comment;
   const voice = useVoiceRecorder();
@@ -408,11 +408,11 @@ function CompleteTaskModal({ task, onClose, onDone }: { task: any; onClose: () =
               </div>
             )}
 
-            {/* Comment — mandatory for Non Booking tasks */}
-            {needsComment && (
+            {/* Comment — available for all task types */}
+            {matrix.comment && (
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
-                  What was done <span style={{ color: '#E93C3C' }}>*</span>
+                  {matrix.bookingId ? 'Comment (optional)' : <>What was done <span style={{ color: '#E93C3C' }}>*</span></>}
                 </div>
                 <textarea
                   className="sv-input"
@@ -703,7 +703,7 @@ export default function TasksPage() {
                     // Extract butler's comment for Non Booking tasks
                     const commentMatch = t.notes?.match(/Comment: ([^·]+)/);
                     const taskNote = commentMatch ? commentMatch[1].trim() : null;
-                    const isNonBooking = t.type === 'Non Booking';
+                    const isNonBooking = t.type === 'Non Booking'; // kept for styling
                     return (
                       <tr key={t.id}>
                         <td>
@@ -734,13 +734,10 @@ export default function TasksPage() {
                         )}
                         <td style={{ fontSize: 13 }}>
                           <div style={{ color: 'var(--muted-fg)' }}>{villaName}</div>
-                          {isNonBooking && taskNote && (
+                          {taskNote && (
                             <div style={{ fontSize: 11, color: '#0C447C', marginTop: 3, background: 'rgba(156,204,252,0.1)', padding: '3px 8px', borderRadius: 6, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               💬 {taskNote}
                             </div>
-                          )}
-                          {isNonBooking && !taskNote && t.status === 'pending' && (
-                            <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2 }}>No comment yet</div>
                           )}
                         </td>
                         <td style={{ color: 'var(--muted-fg)', fontSize: 13 }}>{t.due_time ?? '—'}</td>
