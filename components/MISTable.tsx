@@ -202,7 +202,7 @@ export default function MISTable({ butlers, allTasks, allDelights, allAttendance
   const start = dateFrom
   const end   = dateTo
 
-  const rows = useMemo(() => butlers.map((b:any) => {
+  const rows = useMemo(() => butlers.filter((b:any) => b.squad && b.squad !== 'All' && b.squad !== null).map((b:any) => {
     const bName = b.name
     const rd = redashData[bName] || {}
 

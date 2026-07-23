@@ -466,14 +466,7 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>{selVilla !== 'All' ? `🏡 ${selVilla}` : 'All villas'}</div>
               </div>
             </div>
-            <div className="sv-card" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-              <DonutChart done={allHuddles.filter(h => h.status === 'completed').length} total={allHuddles.length} color="#9CCCFC" label="Huddles" sublabel={`${allHuddles.filter(h=>h.status==='completed').length} done`} />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Huddle completion</div>
-                <div style={{ fontSize: 12, color: 'var(--muted-fg)' }}>{allHuddles.filter(h=>h.status==='completed').length} completed · {allHuddles.filter(h=>h.status!=='completed').length} upcoming</div>
-                <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>{allTrainings.length} training sessions</div>
-              </div>
-            </div>
+
           </div>
         )}
 
@@ -559,7 +552,7 @@ export default function DashboardPage() {
               <a href="/delight" className="sv-btn sv-btn-secondary" style={{ fontSize: 12 }}>🎁 Log activity</a>
               <a href="/tasks" className="sv-btn sv-btn-secondary" style={{ fontSize: 12 }}>✓ View tasks</a>
               <a href="/training" className="sv-btn sv-btn-secondary" style={{ fontSize: 12 }}>📚 Training</a>
-              <a href="/huddle" className="sv-btn sv-btn-secondary" style={{ fontSize: 12 }}>💬 Huddles</a>
+              
             </div>
           </div>
         )}
