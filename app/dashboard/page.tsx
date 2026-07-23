@@ -438,7 +438,7 @@ export default function DashboardPage() {
             { label: 'Task completion', val: `${tasksPct}%`, cls: 'green' },
             { label: 'Delights', val: `${delightsDone}/${filtDelights.length}`, cls: 'coral' },
             { label: 'Delight completion', val: `${delightsPct}%`, cls: 'coral' },
-            { label: 'Huddles', val: allHuddles.length, cls: 'peach' },
+
           ].map(m => (
             <div key={m.label} className={`metric-card ${m.cls}`}>
               <div style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 }}>{m.label}</div>
