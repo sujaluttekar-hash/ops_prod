@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useButlerLocation } from '@/lib/use-butler-location'
 import { isSupervisor } from '@/lib/auth'
 import MISTable from '@/components/MISTable'
+import AIInsights from '@/components/AIInsights'
 
 function BarChart({ data, color, label }: { data: { name: string; value: number }[]; color: string; label: string }) {
   const max = Math.max(...data.map(d => d.value), 1)
@@ -543,6 +544,20 @@ export default function DashboardPage() {
             month={selMonth}
             year={selYear}
           />
+        )}
+
+        {isSuper && (
+          <AIInsights data={{
+            butlers,
+            tasks: allTasks,
+            delights: allDelights,
+            photos: allPhotos,
+            attendance: allAttendance,
+            month: selMonth,
+            year: selYear,
+            dateFrom: `${selYear}-${String(selMonth+1).padStart(2,'0')}-01`,
+            dateTo: new Date().toISOString().slice(0,10),
+          }} />
         )}
 
         {!isSuper && (
