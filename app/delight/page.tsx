@@ -716,6 +716,11 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
             <span style={{ fontSize: 14, fontWeight: 700 }}>🏡 {entry.villa_name || '—'}</span>
             <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sm.bg, color: sm.color }}>{sm.label}</span>
             {ackCount > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(151,196,89,0.12)', color: '#2D5A0E' }}>✅ Acknowledged</span>}
+            {entry.created_at && (
+              <span style={{ fontSize: 10, color: 'var(--muted-fg)', marginLeft: 'auto' }}>
+                🕐 {new Date(entry.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 4 }}>
             {entry.your_name}{entry.squad ? ` · ${entry.squad}` : ''} · {entry.booking_type || '—'} · {entry.booking_date ? new Date(entry.booking_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}{entry.booking_id ? ` · #${entry.booking_id}` : ''}
