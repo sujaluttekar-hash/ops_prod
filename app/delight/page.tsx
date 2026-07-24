@@ -482,7 +482,15 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
 
             if (upErr) {
               console.error(`Photo upload attempt ${attempt} failed (${cat.label}):`, upErr.message);
-              if (attempt === 2) { uploadFailed.push(cat.label); }
+              // Check if it's a storage quota error
+              if (upErr.message?.toLowerCase().includes('quota') || 
+                  upErr.message?.toLowerCase().includes('limit') ||
+                  upErr.message?.toLowerCase().includes('exceeded') ||
+                  upErr.statusCode === '413') {
+                uploadFailed.push(cat.label + ' (storage full — contact admin)');
+              } else {
+                if (attempt === 2) { uploadFailed.push(cat.label); }
+              }
               continue;
             }
 

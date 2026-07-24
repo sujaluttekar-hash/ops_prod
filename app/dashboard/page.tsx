@@ -372,6 +372,16 @@ export default function DashboardPage() {
       />
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
+        {/* Storage warning — admin only */}
+        {isSuper && (
+          <div style={{ background: 'rgba(233,160,167,0.12)', border: '1.5px solid #E9A0A7', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }}>🔴</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#8B2020' }}>Storage almost full — butler photo uploads will fail soon</div>
+              <div style={{ fontSize: 11, color: '#8B2020', marginTop: 2 }}>983 MB of 1,000 MB used (96%). Upgrade Supabase to Pro ($25/month) at supabase.com to get 100GB.</div>
+            </div>
+          </div>
+        )}
 
         {/* Location banners */}
         {user?.role === 'butler' && locStatus === 'denied' && (
