@@ -510,9 +510,12 @@ function LogModal({ editEntry, onClose, onSaved, defaultUser }: { editEntry?: an
         }
       }));
 
-      // Tell user which photos failed (if any)
+      // Tell user which photos failed — keep modal open so they can retry
       if (uploadFailed.length > 0) {
-        setError(`Some photos failed to upload: ${uploadFailed.join(', ')}. Please try editing and re-uploading these categories.`);
+        setSaving(false);
+        setError(`⚠️ Photos failed to upload: ${uploadFailed.join(', ')}. Please check your internet connection and try again. Your entry was saved — edit it to re-upload these photos.`);
+        // Don't close modal — let user see the error and retry
+        return;
       }
 
       // Upload videos NON-BLOCKING — fires after save, doesn't block user
