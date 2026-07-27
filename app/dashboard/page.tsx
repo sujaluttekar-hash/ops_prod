@@ -6,7 +6,9 @@ import { useAuth } from '@/lib/auth-context'
 import { useButlerLocation } from '@/lib/use-butler-location'
 import { isSupervisor } from '@/lib/auth'
 import MISTable from '@/components/MISTable'
+import { PROPERTIES } from '@/lib/properties-data'
 import AIInsights from '@/components/AIInsights'
+import CheckinCalendar from '@/components/CheckinCalendar'
 
 function BarChart({ data, color, label }: { data: { name: string; value: number }[]; color: string; label: string }) {
   const max = Math.max(...data.map(d => d.value), 1)
@@ -301,13 +303,10 @@ export default function DashboardPage() {
   const delightsDone = filtDelights.filter(d => d.status === 'completed').length
   const delightsPct = filtDelights.length > 0 ? Math.round(delightsDone / filtDelights.length * 100) : 0
 
-  // All villas for dropdown
+  // Villa dropdown — from official PROPERTIES list only (no free-text noise)
   const allVillas = useMemo(() => {
-    const s = new Set<string>()
-    allTasks.forEach(t => { const v = villaFromTask(t); if (v && v !== '—') s.add(v) })
-    allDelights.forEach(d => { if (d.villa_name) s.add(d.villa_name) })
-    return Array.from(s).sort()
-  }, [allTasks, allDelights])
+    return PROPERTIES.map((p: any) => p.name).sort()
+  }, [])
 
   // Bar chart data
   const tasksByButler = useMemo(() => {
@@ -542,6 +541,14 @@ export default function DashboardPage() {
             allDelights={allDelights}
             allAttendance={allAttendance}
             allPhotos={allPhotos}
+            month={selMonth}
+            year={selYear}
+          />
+        )}
+
+        {isSuper && (
+          <CheckinCalendar
+            delights={allDelights}
             month={selMonth}
             year={selYear}
           />
