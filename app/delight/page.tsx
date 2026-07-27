@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+
 import Topbar from '@/components/layout/Topbar';
 import { getServiceSupabase, BUCKETS } from '@/lib/supabase';
 import { PROPERTIES } from '@/lib/properties-data';
@@ -946,8 +946,15 @@ export default function DelightPage() {
   const [showModal, setShowModal] = useState(false);
   const [editEntry, setEditEntry] = useState<any | null>(null);
   const [tab, setTab] = useState<'all' | 'in_progress' | 'completed' | 'requests'>('all');
-  const searchParams = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [searchQuery, setSearchQuery] = useState('');
+  // Read ?search= param safely on client side only
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('search');
+      if (q) setSearchQuery(q);
+    } catch {}
+  }, []);
   const isSuper = user ? isSupervisor(user.role as any) : false;
 
   const localUser = (() => { try { return JSON.parse(localStorage.getItem('sv_local_session') || '{}'); } catch { return {}; } })();
