@@ -698,6 +698,7 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
   const [expanded, setExpanded] = useState(false);
   const acks = entry.acknowledged_by || [];
   const hasAcked = acks.includes(currentUserId);
+  const [lightboxPhoto, setLightboxPhoto] = useState<any>(null);
   function onDecline(photoId: string, catLabel: string) {
     onDeclineRequest(photoId, catLabel, entry.your_name, entry.id);
   }
@@ -830,9 +831,14 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, padding: 8 }}>
                       {catPhotos.map((p: any, idx: number) => (
                         <div key={p.id || idx} style={{ borderRadius: 8, overflow: 'hidden', border: `1.5px solid ${p.photo_status === 'approved' ? '#97C459' : p.photo_status === 'declined' ? '#E9A0A7' : 'rgba(0,0,0,0.08)'}` }}>
-                          {/* Photo */}
+                          {/* Photo — lazy loaded, clickable to open lightbox */}
                           {p.public_url && (
-                            <img src={p.public_url} style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
+                            <img
+                              src={p.public_url}
+                              loading="lazy"
+                              onClick={() => setLightboxPhoto(p)}
+                              style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+                            />
                           )}
                           {/* Video */}
                           {p.video_url && (
@@ -840,14 +846,25 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
                               <video src={p.video_url} controls style={{ width: '100%', maxHeight: 140, display: 'block' }} playsInline />
                             </div>
                           )}
-                          {/* Only video, no photo */}
                           {!p.public_url && !p.video_url && (
                             <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📎</div>
                           )}
-                          {/* Status + admin actions */}
+                          {/* Status + timestamp + admin actions */}
                           <div style={{ padding: '5px 7px' }}>
-                            <div style={{ fontSize: 9, color: '#9CA3AF' }}>
+                            <div style={{ fontSize: 9, color: '#9CA3AF', marginBottom: 2 }}>
                               {p.public_url && p.video_url ? '📷+🎥' : p.video_url ? '🎥 Video' : `📷 ${idx + 1}`}
+                              {(p.uploaded_at || p.created_at) && (
+                                <span style={{ marginLeft: 4 }}>
+                                  · {(() => {
+                                    const uploadedStr = p.uploaded_at || p.created_at;
+                                    const updatedStr  = p.updated_at  || p.uploaded_at || p.created_at;
+                                    const uploaded = new Date(uploadedStr).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12:true });
+                                    const updated  = new Date(updatedStr).toLocaleString('en-IN',  { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12:true });
+                                    if (uploaded === updated) return `🕐 ${uploaded}`;
+                                    return `🕐 ${uploaded} · ✏️ ${updated}`;
+                                  })()}
+                                </span>
+                              )}
                             </div>
                             {canAcknowledge && (
                               <div style={{ marginTop: 3 }}>
@@ -875,6 +892,29 @@ function EntryCard({ entry, onEdit, onAcknowledge, onUnacknowledge, onPhotoActio
               );
             })}
           </div>
+
+          {/* Lightbox */}
+          {lightboxPhoto && (
+            <div onClick={() => setLightboxPhoto(null)}
+              style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <button onClick={() => setLightboxPhoto(null)}
+                style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 22, width: 40, height: 40, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              <img src={lightboxPhoto.public_url} onClick={e => e.stopPropagation()}
+                style={{ maxWidth: '95vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8, boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }} />
+              <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+                {(lightboxPhoto.uploaded_at || lightboxPhoto.created_at) && (
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+                    🕐 Uploaded {new Date(lightboxPhoto.uploaded_at || lightboxPhoto.created_at).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true })}
+                  </span>
+                )}
+                {lightboxPhoto.updated_at && lightboxPhoto.updated_at !== lightboxPhoto.uploaded_at && (
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+                    ✏️ Updated {new Date(lightboxPhoto.updated_at).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true })}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {entry.admin_comment && (
             <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(233,160,167,0.08)', border: '1px solid #E9A0A7', borderRadius: 10 }}>
