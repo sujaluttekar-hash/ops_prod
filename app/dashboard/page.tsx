@@ -483,18 +483,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── ACTIVITY CALENDAR ─────────────────────────────────── */}
-        {isSuper && (
-          <div className="sv-card" style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>Activity calendar</div>
-                <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>Click any day to see what happened — tasks assigned, completed, delights logged</div>
-              </div>
-            </div>
-            <ActivityCalendar tasks={filtTasks} delights={filtDelights} month={selMonth} year={selYear} selType={selType} />
-          </div>
-        )}
 
         {/* ── ACTIVITY FEED ─────────────────────────────────────── */}
         <div className="sv-card">
