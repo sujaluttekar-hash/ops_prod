@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Topbar from '@/components/layout/Topbar';
 import { getServiceSupabase, BUCKETS } from '@/lib/supabase';
 import { PROPERTIES } from '@/lib/properties-data';
@@ -945,6 +946,8 @@ export default function DelightPage() {
   const [showModal, setShowModal] = useState(false);
   const [editEntry, setEditEntry] = useState<any | null>(null);
   const [tab, setTab] = useState<'all' | 'in_progress' | 'completed' | 'requests'>('all');
+  const searchParams = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const isSuper = user ? isSupervisor(user.role as any) : false;
 
   const localUser = (() => { try { return JSON.parse(localStorage.getItem('sv_local_session') || '{}'); } catch { return {}; } })();
@@ -1081,6 +1084,14 @@ ${newComment}` : newComment,
   }
 
   const filtered = entries.filter(e => {
+    // URL search param filter — from calendar booking ID click
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const match = (e.booking_id||'').toLowerCase().includes(q) ||
+                    (e.villa_name||'').toLowerCase().includes(q) ||
+                    (e.your_name||'').toLowerCase().includes(q);
+      if (!match) return false;
+    }
     if (tab === 'all') return true;
     if (tab === 'requests') return (e.status === 'pending' || e.status === 'in_progress') && (!e.acknowledged_by || e.acknowledged_by.length === 0);
     if (tab === 'in_progress') return e.status === 'pending' || e.status === 'in_progress';
@@ -1149,6 +1160,17 @@ ${newComment}` : newComment,
 
       <div style={{ padding: 24 }} className="page-enter">
         <div className="sv-strip" />
+        {searchQuery && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', marginBottom: 4 }}>
+            <div style={{ fontSize: 12, color: '#0C447C', background: 'rgba(156,204,252,0.1)', border: '1px solid rgba(156,204,252,0.3)', borderRadius: 8, padding: '5px 12px', fontWeight: 600 }}>
+              🔍 Showing results for: <strong>{searchQuery}</strong>
+            </div>
+            <button onClick={() => setSearchQuery('')}
+              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer', color: 'var(--muted-fg)' }}>
+              Clear ✕
+            </button>
+          </div>
+        )}
 
         {/* Summary cards */}
         {isSuper && (

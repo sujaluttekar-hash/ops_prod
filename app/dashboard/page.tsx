@@ -227,6 +227,7 @@ export default function DashboardPage() {
   })
   const [selVilla, setSelVilla] = useState('All')
   const [selType, setSelType] = useState<'tasks' | 'delights' | 'all'>('all')
+  const [selStatus, setSelStatus] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all')
 
   useEffect(() => { loadAll() }, [user?.id])
 
@@ -333,19 +334,21 @@ export default function DashboardPage() {
     return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,value])=>({name,value}))
   }, [filtTasks])
 
-  // Activity feed — combined, filtered
+  // Activity feed — combined, filtered with status
   const activityFeed = useMemo(() => {
     const hist: any[] = []
-    const showTasks = selType === 'all' || selType === 'tasks'
+    const showTasks    = selType === 'all' || selType === 'tasks'
     const showDelights = selType === 'all' || selType === 'delights'
-    if (showTasks) filtTasks.slice(0, 15).forEach(t => {
-      hist.push({ icon: '✓', color: t.status==='completed'?'#2D5A0E':'#0C447C', bg: t.status==='completed'?'rgba(151,196,89,0.1)':'rgba(156,204,252,0.1)', butler: butlerNameFromTask(t), villa: villaFromTask(t), detail: t.type, status: t.status, time: t.completed_at||t.created_at })
+    if (showTasks) filtTasks.forEach(t => {
+      if (selStatus !== 'all' && t.status !== selStatus) return
+      hist.push({ icon: '✓', color: t.status==='completed'?'#2D5A0E':t.status==='rejected'?'#8B2020':'#0C447C', bg: t.status==='completed'?'rgba(151,196,89,0.1)':t.status==='rejected'?'rgba(233,160,167,0.1)':'rgba(156,204,252,0.1)', butler: butlerNameFromTask(t), villa: villaFromTask(t), detail: t.type, status: t.status, time: t.completed_at||t.created_at, submittedAt: t.created_at })
     })
-    if (showDelights) filtDelights.slice(0, 15).forEach(d => {
-      hist.push({ icon: '🎁', color: '#7A4A08', bg: 'rgba(254,213,169,0.15)', butler: d.your_name||'—', villa: d.villa_name||'—', detail: d.booking_type, status: d.status, time: d.created_at })
+    if (showDelights) filtDelights.forEach(d => {
+      if (selStatus !== 'all' && d.status !== selStatus) return
+      hist.push({ icon: '🎁', color: '#7A4A08', bg: 'rgba(254,213,169,0.15)', butler: d.your_name||'—', villa: d.villa_name||'—', detail: d.booking_type, status: d.status, time: d.created_at, submittedAt: d.created_at })
     })
-    return hist.sort((a,b)=>new Date(b.time||0).getTime()-new Date(a.time||0).getTime()).slice(0,25)
-  }, [filtTasks, filtDelights, selType])
+    return hist.sort((a,b)=>new Date(b.time||0).getTime()-new Date(a.time||0).getTime()).slice(0,50)
+  }, [filtTasks, filtDelights, selType, selStatus])
 
   function timeAgo(t: string) {
     const diff = Date.now() - new Date(t).getTime()
@@ -486,14 +489,28 @@ export default function DashboardPage() {
 
         {/* ── ACTIVITY FEED ─────────────────────────────────────── */}
         <div className="sv-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>Activity feed</div>
-              <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>
-                {activityFeed.length} events · {MONTHS[selMonth]} {selYear}
-                {selButler !== 'All' && ` · ${selButler}`}
-                {selVilla !== 'All' && ` · 🏡 ${selVilla}`}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Activity feed</div>
+                <div style={{ fontSize: 11, color: 'var(--muted-fg)', marginTop: 2 }}>
+                  {activityFeed.length} events · {MONTHS[selMonth]} {selYear}
+                  {selButler !== 'All' && ` · ${selButler}`}
+                  {selVilla !== 'All' && ` · 🏡 ${selVilla}`}
+                </div>
               </div>
+            </div>
+            {/* Status filter pills */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {(['all','pending','completed','rejected'] as const).map(s => (
+                <button key={s} onClick={() => setSelStatus(s)}
+                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontWeight: selStatus === s ? 700 : 400,
+                    background: selStatus === s ? (s==='completed'?'rgba(151,196,89,0.15)':s==='rejected'?'rgba(233,160,167,0.15)':s==='pending'?'rgba(156,204,252,0.15)':'#1B1D1F') : '#F9FAFB',
+                    color: selStatus === s ? (s==='completed'?'#2D5A0E':s==='rejected'?'#8B2020':s==='pending'?'#0C447C':'#fff') : 'var(--muted-fg)',
+                    border: `1px solid ${selStatus===s?(s==='completed'?'#97C459':s==='rejected'?'#E9A0A7':s==='pending'?'#9CCCFC':'#1B1D1F'):'rgba(0,0,0,0.1)'}` }}>
+                  {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
+              ))}
             </div>
           </div>
           <div style={{ marginTop: 14 }}>
@@ -514,7 +531,10 @@ export default function DashboardPage() {
                     <span style={{ marginLeft: 6, padding: '1px 5px', borderRadius: 4, background: h.bg, color: h.color, fontWeight: 600, fontSize: 9.5 }}>{h.status}</span>
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--muted-fg)', flexShrink: 0 }}>{timeAgo(h.time)}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted-fg)', flexShrink: 0, textAlign: 'right' }}>
+                  <div>{timeAgo(h.time)}</div>
+                  {h.submittedAt && <div style={{ fontSize: 9.5, marginTop: 1 }}>{new Date(h.submittedAt).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}</div>}
+                </div>
               </div>
             ))}
           </div>

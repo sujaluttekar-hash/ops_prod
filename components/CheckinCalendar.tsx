@@ -1,5 +1,6 @@
 'use client'
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 
 type DayData = {
   date: string        // YYYY-MM-DD
@@ -34,6 +35,7 @@ export default function CheckinCalendar({ delights, month, year }: {
   const [viewMonth, setViewMonth] = useState(month)
   const [viewYear,  setViewYear]  = useState(year)
   const [selected,  setSelected]  = useState<DayData | null>(null)
+  const router = useRouter()
 
   // Build day-level data from delights (which have booking_id + booking_date + your_name)
   const dayMap = useMemo(() => {
@@ -199,12 +201,20 @@ export default function CheckinCalendar({ delights, month, year }: {
               </div>
             </div>
 
-            {/* Booking IDs */}
+            {/* Booking IDs — click to view photos in Task page */}
             <div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Booking IDs</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted-fg)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                Booking IDs <span style={{ fontWeight: 400, fontSize: 9 }}>(tap to view photos)</span>
+              </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 {selected.bookingIds.map(id => (
-                  <span key={id} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(156,204,252,0.1)', color: '#0C447C', border: '1px solid rgba(156,204,252,0.3)', fontFamily: 'monospace' }}>#{id}</span>
+                  <button key={id}
+                    onClick={() => router.push(`/delight?search=${encodeURIComponent(id)}`)}
+                    style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6, background: 'rgba(156,204,252,0.1)', color: '#0C447C', border: '1px solid rgba(156,204,252,0.3)', fontFamily: 'monospace', cursor: 'pointer', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { (e.target as HTMLElement).style.background = 'rgba(156,204,252,0.25)' }}
+                    onMouseLeave={e => { (e.target as HTMLElement).style.background = 'rgba(156,204,252,0.1)' }}>
+                    #{id} →
+                  </button>
                 ))}
               </div>
             </div>
